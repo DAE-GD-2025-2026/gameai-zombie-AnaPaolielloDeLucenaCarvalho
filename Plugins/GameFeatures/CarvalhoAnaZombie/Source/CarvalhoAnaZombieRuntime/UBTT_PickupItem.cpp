@@ -29,8 +29,17 @@ EBTNodeResult::Type UUBTT_PickupItem::ExecuteTask(UBehaviorTreeComponent& OwnerC
 
 	if (ItemToPickup)
 	{
-		// add to backpack - forcing to slot 0 for now (CHANGE THIS)
-		bool bSuccess = InventoryComp->GrabItem(0, ItemToPickup);
+		bool bSuccess = false;
+       
+		// 5 slots - will try to place item in each slot
+		for (int i = 0; i < 5; ++i) 
+		{
+			if (InventoryComp->GrabItem(i, ItemToPickup))
+			{
+				bSuccess = true;
+				break;
+			}
+		}
 
 		if (bSuccess)
 		{
