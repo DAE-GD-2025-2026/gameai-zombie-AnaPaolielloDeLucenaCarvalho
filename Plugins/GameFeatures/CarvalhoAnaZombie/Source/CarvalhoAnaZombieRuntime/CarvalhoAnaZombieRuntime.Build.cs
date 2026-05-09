@@ -26,6 +26,7 @@ public class CarvalhoAnaZombieRuntime : ModuleRules
 			new string[]
 			{
 				"Core",
+				"GameAI_Zombie" // to be able to use base zombie and item
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
