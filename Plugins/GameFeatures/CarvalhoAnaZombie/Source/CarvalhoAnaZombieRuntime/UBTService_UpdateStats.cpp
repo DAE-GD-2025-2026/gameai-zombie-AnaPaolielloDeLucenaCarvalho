@@ -5,6 +5,9 @@
 #include "Common/HealthComponent.h"
 #include "Common/InventoryComponent.h"
 #include "Items/Weapon.h"
+#include "Items/Medkit.h"
+#include "Items/Food.h"
+#include "Common/StaminaComponent.h"
 
 UBTService_UpdateStats::UBTService_UpdateStats()
 {
@@ -33,25 +36,32 @@ void UBTService_UpdateStats::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* 
 		// write to memory
 		BlackboardComp->SetValueAsFloat(FName("CurrentHealth"), CurrentHealth);
 	}
+	
+	// Monitor Stamina
+	if (UStaminaComponent* StaminaComp = SurvivorPawn->FindComponentByClass<UStaminaComponent>())
+	{
+		float CurrentStamina = StaminaComp->GetCurrentStamina();
+		BlackboardComp->SetValueAsFloat(FName("CurrentStamina"), CurrentStamina);
+	}
 
 	// monitor inventory
 	if (UInventoryComponent* InventoryComp = SurvivorPawn->FindComponentByClass<UInventoryComponent>())
 	{
-		bool bHasWeapon = false; // don't have a weapon by default
+		bool bHasWeapon = false;
+		bool bHasMedkit = false;
+		bool bHasFood = false;
 
-		// get backpack items
 		TArray<ABaseItem*> Backpack = InventoryComp->GetInventory();
-
+		
 		for (ABaseItem* Item : Backpack)
 		{
-			if (Item && Cast<AWeapon>(Item))
-			{
-				bHasWeapon = true;
-				break;
-			}
+			if (Item && Cast<AWeapon>(Item)) bHasWeapon = true;
+			if (Item && Cast<AMedkit>(Item)) bHasMedkit = true;
+			if (Item && Cast<AFood>(Item)) bHasFood = true;
 		}
 
-		// write to memory
 		BlackboardComp->SetValueAsBool(FName("HasWeapon"), bHasWeapon);
+		BlackboardComp->SetValueAsBool(FName("HasMedkit"), bHasMedkit);
+		BlackboardComp->SetValueAsBool(FName("HasFood"), bHasFood);
 	}
 }

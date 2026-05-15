@@ -1,14 +1,14 @@
-﻿#include "UBTT_ShootWeapon.h"
+﻿#include "UBTT_Heal.h"
 #include "AIController.h"
 #include "Common/InventoryComponent.h"
-#include "Items/Weapon.h"
+#include "Items/Medkit.h"
 
-UUBTT_ShootWeapon::UUBTT_ShootWeapon()
+UUBTT_Heal::UUBTT_Heal()
 {
-	NodeName = "Shoot Weapon";
+	NodeName = "Use Medkit";
 }
 
-EBTNodeResult::Type UUBTT_ShootWeapon::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_Heal::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	AAIController* AIController = OwnerComp.GetAIOwner();
 	if (!AIController) return EBTNodeResult::Failed;
@@ -19,21 +19,14 @@ EBTNodeResult::Type UUBTT_ShootWeapon::ExecuteTask(UBehaviorTreeComponent& Owner
 	UInventoryComponent* InventoryComp = Pawn->FindComponentByClass<UInventoryComponent>();
 	if (!InventoryComp) return EBTNodeResult::Failed;
 
-	// open backpack
 	TArray<ABaseItem*> Backpack = InventoryComp->GetInventory();
 
-	// look for weapon
 	for (int i = 0; i < Backpack.Num(); ++i)
 	{
-		if (Backpack[i] && Cast<AWeapon>(Backpack[i]))
+		if (Backpack[i] && Cast<AMedkit>(Backpack[i]))
 		{
-			InventoryComp->UseItem(i); // pull trigger
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("BANG BANG!"));
-			
-			// if (!bFired || Backpack[i]->GetValue() == 0)
-			// {
-			// 	  InventoryComp->RemoveItem(i);
-			// }
+			InventoryComp->UseItem(i);
+			//InventoryComp->RemoveItem(i);
 			return EBTNodeResult::Succeeded;
 		}
 	}

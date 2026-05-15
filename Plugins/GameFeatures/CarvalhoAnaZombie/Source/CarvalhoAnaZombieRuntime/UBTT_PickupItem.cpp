@@ -30,14 +30,25 @@ EBTNodeResult::Type UUBTT_PickupItem::ExecuteTask(UBehaviorTreeComponent& OwnerC
 	if (ItemToPickup)
 	{
 		bool bSuccess = false;
-       
-		// 5 slots - will try to place item in each slot
-		for (int i = 0; i < 5; ++i) 
+        
+		// open the backpack
+		TArray<ABaseItem*> Backpack = InventoryComp->GetInventory();
+
+		// check each slot
+		for (int i = 0; i < Backpack.Num(); ++i) 
 		{
-			if (InventoryComp->GrabItem(i, ItemToPickup))
+			// grab item if slot is empty
+			if (Backpack[i] == nullptr)
 			{
-				bSuccess = true;
-				break;
+				if (InventoryComp->GrabItem(i, ItemToPickup))
+				{
+					// hide item in game
+					ItemToPickup->SetActorHiddenInGame(true);
+					ItemToPickup->SetActorEnableCollision(false);
+
+					bSuccess = true;
+					break;
+				}
 			}
 		}
 

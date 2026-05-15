@@ -3,7 +3,7 @@
 
 UUBTT_ClearMemory::UUBTT_ClearMemory()
 {
-	NodeName = "Clear Memory (Reset)";
+	NodeName = "Clear Memory (Dynamic)";
 }
 
 EBTNodeResult::Type UUBTT_ClearMemory::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
@@ -11,9 +11,7 @@ EBTNodeResult::Type UUBTT_ClearMemory::ExecuteTask(UBehaviorTreeComponent& Owner
 	UBlackboardComponent* BBComp = OwnerComp.GetBlackboardComponent();
 	if (!BBComp) return EBTNodeResult::Failed;
 
-	// delete memory so player can restart logic
-	BBComp->ClearValue(FName("NearestHouse"));
-	BBComp->ClearValue(FName("NearestZombie"));
+	BBComp->ClearValue(KeyToClear.SelectedKeyName);
 
 	return EBTNodeResult::Succeeded;
 }

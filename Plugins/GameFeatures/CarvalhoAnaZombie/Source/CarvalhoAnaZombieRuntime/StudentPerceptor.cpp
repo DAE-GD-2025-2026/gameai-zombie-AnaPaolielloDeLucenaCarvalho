@@ -10,6 +10,8 @@
 #include "Zombies/BaseZombie.h"
 #include "Items/BaseItem.h"
 #include "Items/Medkit.h"
+#include "Items/Weapon.h"
+#include "Items/Food.h"
 #include "Village/House/House.h"
 
 
@@ -39,7 +41,7 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	}
 	
 	// DEBUG - what object was seen?
-	GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, FString::Printf(TEXT("Sensed Actor: %s"), *Actor->GetName()));
+	// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, FString::Printf(TEXT("Sensed Actor: %s"), *Actor->GetName()));
 
 	// get AI Controller
 	AAIController* AIController = Cast<AAIController>(GetOwner());
@@ -72,9 +74,16 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	if (ABaseZombie* SeenZombie = Cast<ABaseZombie>(Actor))
 	{
 		BlackboardComp->SetValueAsObject(FName("NearestZombie"), SeenZombie);
-		
-		// DEBUG - we see a zombie
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("I see a Zombie!"));
+
+		// is heavy zombie?
+		if (SeenZombie->GetName().Contains("Heavy"))
+		{
+			BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), true);
+		}
+		else
+		{
+			BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), false);
+		}
 	}
 	// is House? (Fleeing logic)
 	else if (AHouse* SeenHouse = Cast<AHouse>(Actor))
@@ -82,7 +91,16 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 		BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
 		
 		// DEBUG - we see a house
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("I see a House!"));
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("I see a House!"));
+	}
+	// is a Weapon?
+	else if (AWeapon* SeenWeapon = Cast<AWeapon>(Actor))
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestWeapon"), SeenWeapon);		
+		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenWeapon); 
+		
+		// DEBUG - we see a weapon
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("I see a Weapon!"));
 	}
 	// is a Medkit?
 	else if (AMedkit* SeenMedkit = Cast<AMedkit>(Actor))
@@ -90,11 +108,24 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 		BlackboardComp->SetValueAsObject(FName("NearestMedkit"), SeenMedkit);
 		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenMedkit); 
 		
-		// DEBUG - we see a medkit (which is also an item)
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Blue, TEXT("I see a Medkit!"));
-	}	
+		// DEBUG - we see a medkit
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Blue, TEXT("I see a Medkit!"));
+	}
+	// is Food?
+	else if (AFood* SeenFood = Cast<AFood>(Actor))
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenFood);
+		
+		// DEBUG - we see food
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("I see Food!"));
+	}
+	// is a Purge Zone?
+	else if (Actor->GetName().Contains("Purge"))
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestPurgeZone"), Actor);
+	}
 	// is a generic Item?
-	else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor))
+	/*else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor))
 	{
 		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
 		
@@ -105,5 +136,5 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	{
 		// DEBUG - we see something else
 		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::White, TEXT("Saw something else"));
-	}
+	}*/
 }
