@@ -9,6 +9,8 @@
 // these work bc we changed the dependencies in the .Build.cs file
 #include "Zombies/BaseZombie.h"
 #include "Items/BaseItem.h"
+#include "Items/Medkit.h"
+#include "Village/House/House.h"
 
 
 UStudentPerceptor::UStudentPerceptor()
@@ -66,7 +68,7 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	}
 	
 
-	// is actor Zombie?
+	// is a Zombie?
 	if (ABaseZombie* SeenZombie = Cast<ABaseZombie>(Actor))
 	{
 		BlackboardComp->SetValueAsObject(FName("NearestZombie"), SeenZombie);
@@ -74,7 +76,24 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 		// DEBUG - we see a zombie
 		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("I see a Zombie!"));
 	}
-	// is actor Item
+	// is House? (Fleeing logic)
+	else if (AHouse* SeenHouse = Cast<AHouse>(Actor))
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
+		
+		// DEBUG - we see a house
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("I see a House!"));
+	}
+	// is a Medkit?
+	else if (AMedkit* SeenMedkit = Cast<AMedkit>(Actor))
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestMedkit"), SeenMedkit);
+		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenMedkit); 
+		
+		// DEBUG - we see a medkit (which is also an item)
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Blue, TEXT("I see a Medkit!"));
+	}	
+	// is a generic Item?
 	else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor))
 	{
 		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
@@ -85,6 +104,6 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	else
 	{
 		// DEBUG - we see something else
-		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::White, TEXT("Saw something, but it's not a Zombie or Item."));
+		GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::White, TEXT("Saw something else"));
 	}
 }
