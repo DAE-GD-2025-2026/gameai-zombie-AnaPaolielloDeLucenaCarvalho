@@ -13,6 +13,7 @@
 #include "Items/Weapon.h"
 #include "Items/Food.h"
 #include "Village/House/House.h"
+#include "Common/InventoryComponent.h"
 
 
 UStudentPerceptor::UStudentPerceptor()
@@ -79,63 +80,74 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 				BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), false);
 			}
 
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH! Bit from behind!"));
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH! BEHIND USE!"));
 			
 			return; 
 		}
 	}
 	
-	// SIGHT SENSE
-	if (ABaseZombie* SeenZombie = Cast<ABaseZombie>(Actor)) // is a Zombie?
+	APawn* Pawn = AIController->GetPawn();
+	UInventoryComponent* InventoryComp = Pawn->FindComponentByClass<UInventoryComponent>();
+	
+	int EmptySlots = 0;
+	bool bHasWeapon = false;
+	
+	if (InventoryComp)
 	{
-		BlackboardComp->SetValueAsObject(FName("NearestZombie"), SeenZombie);
-
-		// is heavy zombie?
-		if (SeenZombie->GetName().Contains("Heavy"))
+		for (ABaseItem* Item : InventoryComp->GetInventory())
 		{
-			BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), true);
+			if (Item == nullptr) EmptySlots++;
+			if (Item && Cast<AWeapon>(Item)) bHasWeapon = true;
+		}
+	}
+	
+	// SIGHT SENSE & MEMORY
+	if (ABaseZombie* SeenZombie = Cast<ABaseZombie>(Actor)) // -> is a Zombie?
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestZombie"), SeenZombie);		
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("I see a Zombie!"));
+	}
+	else if (AHouse* SeenHouse = Cast<AHouse>(Actor)) // -> is a House? (Seeking logic)
+	{
+		BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("I see a House!"));
+		
+		// Add to memory (AddUnique = don't add same house twice)
+		KnownHouses.AddUnique(SeenHouse->GetActorLocation()); 
+	}
+	else if (AWeapon* SeenWeapon = Cast<AWeapon>(Actor)) // -> is a Weapon? (Seeking logic)
+	{
+		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("I see a Weapon!"));
+		
+		// do we have space + do we need it?
+		if (EmptySlots > 0 && !bHasWeapon)
+		{
+			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenWeapon);
 		}
 		else
 		{
-			BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), false);
+			// not needed, save to memory
+			KnownItems.AddUnique(SeenWeapon);
 		}
 	}
-	else if (AHouse* SeenHouse = Cast<AHouse>(Actor)) // is House? (Fleeing logic)
+	else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor)) // -> is a Medkit / Food / Garbage? (Seeking logic)
 	{
-		BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
-		
-		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("I see a House!"));
-	}
-	else if (AWeapon* SeenWeapon = Cast<AWeapon>(Actor)) // is a Weapon?
-	{
-		BlackboardComp->SetValueAsObject(FName("NearestWeapon"), SeenWeapon);		
-		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenWeapon); 
-		
-		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("I see a Weapon!"));
-	}
-	else if (AMedkit* SeenMedkit = Cast<AMedkit>(Actor)) // is a Medkit?
-	{
-		BlackboardComp->SetValueAsObject(FName("NearestMedkit"), SeenMedkit);
-		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenMedkit); 
-		
-		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Blue, TEXT("I see a Medkit!"));
-	}
-	else if (AFood* SeenFood = Cast<AFood>(Actor)) // is Food?
-	{
-		BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenFood);
-		
-		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Green, TEXT("I see Food!"));
-	}
-	else if (Actor->GetName().Contains("Purge")) // is a Purge Zone? (Fleeing logic)
-	{
-		BlackboardComp->SetValueAsObject(FName("NearestPurgeZone"), Actor);
-	}
-	else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor)) // is Garbage?
-	{
+		// garbage we always pickup since it wont take up inventory space
 		if (SeenItem->GetItemType() == EItemType::Garbage)
 		{
 			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
-			return; 
+		}
+		
+		// do we have space for Food/Medkits?
+		if (EmptySlots > 0)
+		{
+			// have space, grab it
+			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
+		}
+		else
+		{
+			// no space, save to memory
+			KnownItems.AddUnique(SeenItem);
 		}
 	}
 	
