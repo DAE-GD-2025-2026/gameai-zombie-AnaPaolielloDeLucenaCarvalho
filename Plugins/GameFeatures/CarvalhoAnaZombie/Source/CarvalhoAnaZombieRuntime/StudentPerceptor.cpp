@@ -130,6 +130,14 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	{
 		BlackboardComp->SetValueAsObject(FName("NearestPurgeZone"), Actor);
 	}
+	else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor)) // is Garbage?
+	{
+		if (SeenItem->GetItemType() == EItemType::Garbage)
+		{
+			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
+			return; 
+		}
+	}
 	
 	// Old code for generic item sensing
 	{

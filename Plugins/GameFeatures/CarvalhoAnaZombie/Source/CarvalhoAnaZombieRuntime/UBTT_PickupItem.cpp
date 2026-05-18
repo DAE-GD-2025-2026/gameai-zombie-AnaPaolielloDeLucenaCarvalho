@@ -29,6 +29,15 @@ EBTNodeResult::Type UUBTT_PickupItem::ExecuteTask(UBehaviorTreeComponent& OwnerC
 
 	if (ItemToPickup)
 	{
+		// if garbage, destroy to clean world and free memory
+		if (ItemToPickup->GetItemType() == EItemType::Garbage)
+		{
+			// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, TEXT("Stomped on Garbage!"));
+			ItemToPickup->Destroy();
+			
+			return EBTNodeResult::Succeeded;
+		}
+
 		bool bSuccess = false;
         
 		// open the backpack
