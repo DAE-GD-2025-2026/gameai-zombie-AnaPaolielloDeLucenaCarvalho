@@ -125,7 +125,29 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		DesiredDirection = WanderForce; // explore
 	}
 
-	FinalSteeringForce = DesiredDirection + AvoidanceForce;
+	// currently hitting walls?
+	if (!AvoidanceForce.IsNearlyZero())
+	{
+		// general direction the walls are pushing
+		FVector WallNormal = AvoidanceForce.GetSafeNormal();
+
+		// project desired direction onto wall to find sliding path
+		FVector SlideDirection = FVector::VectorPlaneProject(DesiredDirection, WallNormal);
+
+		// are we pushing straight into the wall? (cancel slide)
+		if (SlideDirection.SizeSquared() < 0.1f)
+		{
+			SlideDirection = FVector::CrossProduct(FVector::UpVector, WallNormal);
+		}
+
+		// slide + push away from the wall
+		FinalSteeringForce = SlideDirection + AvoidanceForce;
+	}
+	else
+	{
+		// psth clear
+		FinalSteeringForce = DesiredDirection;
+	}
 	
 	FinalSteeringForce.Z = 0.0f; // Keep on ground
 	FinalSteeringForce.Normalize();
