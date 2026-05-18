@@ -30,10 +30,6 @@ EBTNodeResult::Type UUBTT_ShootWeapon::ExecuteTask(UBehaviorTreeComponent& Owner
 			InventoryComp->UseItem(i); // pull trigger
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("BANG BANG!"));
 			
-			// if (!bFired || Backpack[i]->GetValue() == 0)
-			// {
-			// 	  InventoryComp->RemoveItem(i);
-			// }
 			return EBTNodeResult::Succeeded;
 		}
 	}

@@ -8,6 +8,8 @@
 #include "Items/Medkit.h"
 #include "Items/Food.h"
 #include "Common/StaminaComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Zombies/BaseZombie.h"
 
 UBTService_UpdateStats::UBTService_UpdateStats()
 {
@@ -31,10 +33,51 @@ void UBTService_UpdateStats::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* 
 	// monitor health
 	if (UHealthComponent* HealthComp = SurvivorPawn->FindComponentByClass<UHealthComponent>())
 	{
-		float CurrentHealth = HealthComp->GetHealth(); 
+		// get old health
+		float OldHealth = BlackboardComp->GetValueAsFloat(FName("CurrentHealth"));
+		float NewHealth = HealthComp->GetHealth(); 
         
-		// write to memory
-		BlackboardComp->SetValueAsFloat(FName("CurrentHealth"), CurrentHealth);
+		// have we taken damage since the last tick (since DAMAGE SENSE in student perceptor didnt work)
+		if (NewHealth < OldHealth && OldHealth > 0.0f)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH!"));
+
+			// search for all zombies
+			TArray<AActor*> FoundZombies;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), ABaseZombie::StaticClass(), FoundZombies);
+
+			AActor* ClosestZombie = nullptr;
+			float ClosestDistance = 999999.0f;
+
+			// find the one biting
+			for (AActor* Zombie : FoundZombies)
+			{
+				float Distance = FVector::Dist(SurvivorPawn->GetActorLocation(), Zombie->GetActorLocation());
+				if (Distance < ClosestDistance)
+				{
+					ClosestDistance = Distance;
+					ClosestZombie = Zombie;
+				}
+			}
+
+			// get zombie in memory
+			if (ClosestZombie)
+			{
+				BlackboardComp->SetValueAsObject(FName("NearestZombie"), ClosestZombie);
+
+				// check for Heavy zombie
+				if (ClosestZombie->GetName().Contains("Heavy")) 
+				{
+					BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), true);
+				} else 
+				{
+					BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), false);
+				}
+			}
+		}
+
+		// write new health
+		BlackboardComp->SetValueAsFloat(FName("CurrentHealth"), NewHealth);
 	}
 	
 	// Monitor Stamina
