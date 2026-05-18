@@ -109,11 +109,19 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	}
 	else if (AHouse* SeenHouse = Cast<AHouse>(Actor)) // -> is a House? (Seeking logic)
 	{
-		BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
-		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Orange, TEXT("I see a House!"));
-		
-		// Add to memory (AddUnique = don't add same house twice)
+		// THE MAP - remember where this house is for emergencies (hiding)
 		KnownHouses.AddUnique(SeenHouse->GetActorLocation()); 
+
+		// LOOT - did we already looted this house?
+		if (!VisitedHouses.Contains(SeenHouse))
+		{
+			// new house, loot it
+			BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
+		}
+		else
+		{
+			// already looted -	 not seting NearestHouse
+		}
 	}
 	else if (AWeapon* SeenWeapon = Cast<AWeapon>(Actor)) // -> is a Weapon? (Seeking logic)
 	{

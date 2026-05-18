@@ -24,6 +24,25 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	if (!Pawn) return;
 
 	FVector FinalSteeringForce = FVector::ZeroVector;
+	
+// SEEK BEHAVIOR
+	FVector SeekForce = FVector::ZeroVector;
+
+	if (BBComp->GetValueAsBool(FName("IsInsideHouse")))
+	{
+		FVector TargetLocation = BBComp->GetValueAsVector(FName("TargetLocation"));
+		float DistanceToTarget = FVector::Dist2D(Pawn->GetActorLocation(), TargetLocation);
+
+		if (DistanceToTarget < 150.0f)
+		{
+			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+			return; 
+		}
+
+		SeekForce = TargetLocation - Pawn->GetActorLocation();
+		SeekForce.Z = 0.0f;
+		SeekForce.Normalize();
+	}
 
 // WANDER (Lab: SteeringBehaviors.cpp)
 	WanderAngle += FMath::RandRange(-WanderJitter, WanderJitter) * DeltaSeconds;
@@ -54,21 +73,62 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		FleeForce.Normalize();
 	}
 
+// OBSTACLE AVOIDANCE
+	FVector AvoidanceForce = FVector::ZeroVector;
+	
+	FVector Start = Pawn->GetActorLocation();
+	FVector Forward = Pawn->GetActorForwardVector();
 
-// BLENDED STEERING (Lab: CombinedSteeringBehaviors.cpp)
-	if (!FleeForce.IsNearlyZero())
+	struct FWhisker { float Angle; float Distance; };
+	TArray<FWhisker> Whiskers = 
 	{
-		// if being chased (Flee = 80%, Wander = 20%)
-		FinalSteeringForce = (FleeForce * 0.8f) + (WanderForce * 0.2f);
+		{ -45.0f, 75.0f }, // Left
+		{ 0.0f,   100.0f }, // Center 
+		{ 45.0f,  75.0f }  // Right
+	};
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(Pawn);
+
+	for (const FWhisker& Whisker : Whiskers)
+	{
+		FVector WhiskerDir = Forward.RotateAngleAxis(Whisker.Angle, FVector::UpVector);
+		FVector End = Start + (WhiskerDir * Whisker.Distance);
+
+		FHitResult Hit;
+		if (Pawn->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+		{
+			float ProximityRatio = 1.0f - (Hit.Distance / Whisker.Distance);
+			AvoidanceForce += Hit.ImpactNormal * ProximityRatio * 2.5f;
+			DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, -1.0f, 0, 2.0f);
+		}
+		else
+		{
+			DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, -1.0f, 0, 1.0f);
+		}
 	}
-	else
+	
+// BLENDED STEERING (Lab: CombinedSteeringBehaviors.cpp)	
+	FVector DesiredDirection = FVector::ZeroVector;
+
+	// what is the goal?
+	if (!FleeForce.IsNearlyZero()) 
 	{
-		// if safe (Wander = 100%)
-		FinalSteeringForce = WanderForce;
+		DesiredDirection = (FleeForce * 0.8f) + (WanderForce * 0.2f);
+	} 
+	else if (!SeekForce.IsNearlyZero()) 
+	{
+		DesiredDirection = SeekForce; // door
+	} 
+	else 
+	{
+		DesiredDirection = WanderForce; // explore
 	}
 
+	FinalSteeringForce = DesiredDirection + AvoidanceForce;
+	
+	FinalSteeringForce.Z = 0.0f; // Keep on ground
 	FinalSteeringForce.Normalize();
-
 
 // APPLY TO UNREAL - Now (after feedback) instead of using MoveTo in the BT, we add the steering into pawn
 	Pawn->AddMovementInput(FinalSteeringForce, 1.0f);

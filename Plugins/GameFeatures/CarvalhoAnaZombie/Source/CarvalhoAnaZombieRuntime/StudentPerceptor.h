@@ -11,6 +11,7 @@
 #include "StudentPerceptor.generated.h"
 
 class ABaseItem;
+class AHouse;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class CARVALHOANAZOMBIERUNTIME_API UStudentPerceptor : public UActorComponent
@@ -28,7 +29,9 @@ public:
 	
 	// Memory
 	UPROPERTY()
-	TArray<FVector> KnownHouses;
+	TArray<FVector> KnownHouses;	
+	UPROPERTY()
+	TArray<AHouse*> VisitedHouses;
 
 	UPROPERTY()
 	TArray<ABaseItem*> KnownItems;
