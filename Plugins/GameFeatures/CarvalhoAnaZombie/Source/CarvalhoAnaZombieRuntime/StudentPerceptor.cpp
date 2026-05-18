@@ -102,10 +102,24 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 	}
 	
 	// SIGHT SENSE & MEMORY
-	if (ABaseZombie* SeenZombie = Cast<ABaseZombie>(Actor)) // -> is a Zombie?
+	if (ABaseZombie* SeenZombie = Cast<ABaseZombie>(Actor)) // -> is a Zombie? (Fleeing logic)
 	{
-		BlackboardComp->SetValueAsObject(FName("NearestZombie"), SeenZombie);		
+		BlackboardComp->SetValueAsObject(FName("NearestZombie"), SeenZombie);
 		// GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Red, TEXT("I see a Zombie!"));
+
+		// heavy zombie?
+		if (SeenZombie->GetName().Contains("Heavy")) {
+			BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), true);
+		} else {
+			BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), false);
+		}
+
+		// runner zombie?
+		if (SeenZombie->GetName().Contains("Runner")) {
+			BlackboardComp->SetValueAsBool(FName("IsRunnerZombie"), true);
+		} else {
+			BlackboardComp->SetValueAsBool(FName("IsRunnerZombie"), false);
+		}
 	}
 	else if (AHouse* SeenHouse = Cast<AHouse>(Actor)) // -> is a House? (Seeking logic)
 	{

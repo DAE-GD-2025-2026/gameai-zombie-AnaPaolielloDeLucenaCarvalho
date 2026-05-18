@@ -2,6 +2,8 @@
 #include "AIController.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "Survivor/SurvivorPawn.h"
+#include "Common/StaminaComponent.h"
 
 UUBTT_BlendedSteer::UUBTT_BlendedSteer()
 {
@@ -151,7 +153,45 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	
 	FinalSteeringForce.Z = 0.0f; // Keep on ground
 	FinalSteeringForce.Normalize();
+	
+// SPRINTING (Energy Management)
+	if (ASurvivorPawn* Survivor = Cast<ASurvivorPawn>(Pawn))
+	{
+		bool bShouldSprint = false;
 
+		// do we need to sprint? only sprint if fleeing
+		if (!FleeForce.IsNearlyZero())
+		{
+			bool bIsHeavy = BBComp->GetValueAsBool(FName("IsHeavyZombie"));
+			bool bIsRunner = BBComp->GetValueAsBool(FName("IsRunnerZombie"));
+			bool bIsInPurgeZone = BBComp->GetValueAsBool(FName("IsInPurgeZone"));
+			
+			// away from fast/strong zombies and purge zones
+			if (bIsHeavy || bIsRunner || bIsInPurgeZone)
+			{
+				bShouldSprint = true;
+			}
+		}
+
+		// have stamina to sprint?
+		if (UStaminaComponent* StaminaComp = Survivor->FindComponentByClass<UStaminaComponent>())
+		{
+			if (StaminaComp->GetCurrentStamina() <= 0.0f)
+			{
+				bShouldSprint = false; // nopes
+			}
+		}
+
+		if (bShouldSprint)
+		{
+			Survivor->StartRunning();
+		}
+		else
+		{
+			Survivor->StopRunning();
+		}
+	}
+	
 // APPLY TO UNREAL - Now (after feedback) instead of using MoveTo in the BT, we add the steering into pawn
 	Pawn->AddMovementInput(FinalSteeringForce, 1.0f);
 
