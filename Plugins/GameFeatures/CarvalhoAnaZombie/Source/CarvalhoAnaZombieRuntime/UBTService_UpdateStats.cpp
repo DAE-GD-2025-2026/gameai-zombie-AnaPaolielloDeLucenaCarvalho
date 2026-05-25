@@ -2,6 +2,7 @@
 #include "BehaviorTree/BlackboardComponent.h"
 
 #include "AIController.h"
+#include "StudentPerceptor.h"
 #include "Common/HealthComponent.h"
 #include "Common/InventoryComponent.h"
 #include "Items/Weapon.h"
@@ -106,5 +107,56 @@ void UBTService_UpdateStats::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* 
 		BlackboardComp->SetValueAsBool(FName("HasWeapon"), bHasWeapon);
 		BlackboardComp->SetValueAsBool(FName("HasMedkit"), bHasMedkit);
 		BlackboardComp->SetValueAsBool(FName("HasFood"), bHasFood);
+	}
+	
+	// memory retrival
+	UStudentPerceptor* Perceptor = SurvivorPawn->FindComponentByClass<UStudentPerceptor>();
+	UObject* CurrentTargetItem = BlackboardComp->GetValueAsObject(FName("NearestItem"));
+        
+	// search memory if not walking towards an item
+	if (Perceptor && !CurrentTargetItem)
+	{
+		// clean memory
+		Perceptor->KnownItems.RemoveAll([](ABaseItem* MemItem) { return !IsValid(MemItem); });
+
+		float MyHealth = BlackboardComp->GetValueAsFloat(FName("CurrentHealth"));
+		float MyStamina = BlackboardComp->GetValueAsFloat(FName("CurrentStamina"));
+		bool bHaveWeapon = BlackboardComp->GetValueAsBool(FName("HasWeapon"));
+		bool bHaveMedkit = BlackboardComp->GetValueAsBool(FName("HasMedkit"));
+		bool bHaveFood = BlackboardComp->GetValueAsBool(FName("HasFood"));
+
+		ABaseItem* BestMemoryItem = nullptr;
+		float ClosestDist = 999999.0f;
+
+		// what do we need? find the most urgent thing in memory (health, stamina, weapon)
+		for (ABaseItem* MemItem : Perceptor->KnownItems)
+		{
+			if (!IsValid(MemItem)) continue;
+                
+			bool bNeedThis = false;
+                
+			if (Cast<AMedkit>(MemItem) && MyHealth <= 5.0f && !bHaveMedkit) bNeedThis = true;
+			if (Cast<AFood>(MemItem) && MyStamina <= 5.0f && !bHaveFood) bNeedThis = true;
+			if (Cast<AWeapon>(MemItem) && !bHaveWeapon) bNeedThis = true;
+
+			if (bNeedThis)
+			{
+				float Dist = FVector::Dist(SurvivorPawn->GetActorLocation(), MemItem->GetActorLocation());
+				if (Dist < ClosestDist)
+				{
+					ClosestDist = Dist;
+					BestMemoryItem = MemItem;
+				}
+			}
+		}
+
+		// we found something in memory that we need = new target
+		if (BestMemoryItem)
+		{
+			BlackboardComp->SetValueAsObject(FName("NearestItem"), BestMemoryItem);
+			GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Cyan, TEXT("Remembered an item! Going back for it!"));
+                
+			Perceptor->KnownItems.Remove(BestMemoryItem);
+		}
 	}
 }

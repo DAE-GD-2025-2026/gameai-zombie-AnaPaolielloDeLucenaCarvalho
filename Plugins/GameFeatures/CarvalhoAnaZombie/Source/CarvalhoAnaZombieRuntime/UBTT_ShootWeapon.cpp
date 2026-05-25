@@ -30,6 +30,13 @@ EBTNodeResult::Type UUBTT_ShootWeapon::ExecuteTask(UBehaviorTreeComponent& Owner
 			InventoryComp->UseItem(i); // pull trigger
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, TEXT("BANG BANG!"));
 			
+			// Throw away 0 ammo gun
+			if (Backpack[i]->GetValue() <= 0)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Orange, TEXT("Gun empty!"));
+				InventoryComp->RemoveItem(i);
+			}
+			
 			return EBTNodeResult::Succeeded;
 		}
 	}

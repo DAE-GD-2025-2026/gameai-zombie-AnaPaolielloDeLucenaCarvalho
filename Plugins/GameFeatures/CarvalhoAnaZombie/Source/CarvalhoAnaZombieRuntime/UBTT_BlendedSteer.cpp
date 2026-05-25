@@ -1,5 +1,6 @@
 ﻿#include "UBTT_BlendedSteer.h"
 #include "AIController.h"
+#include "StudentPerceptor.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Survivor/SurvivorPawn.h"
@@ -25,9 +26,12 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	APawn* Pawn = AIController->GetPawn();
 	if (!Pawn) return;
 
+	UWorld* World = Pawn->GetWorld();
+	if (!World) return;
+
 	FVector FinalSteeringForce = FVector::ZeroVector;
 	
-// SEEK BEHAVIOR
+// PATH FOLLOWING  (exit house door)
 	FVector SeekForce = FVector::ZeroVector;
 
 	if (BBComp->GetValueAsBool(FName("IsInsideHouse")))
@@ -35,26 +39,36 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		FVector TargetLocation = BBComp->GetValueAsVector(FName("TargetLocation"));
 		float DistanceToTarget = FVector::Dist2D(Pawn->GetActorLocation(), TargetLocation);
 
-		if (DistanceToTarget < 150.0f)
+		if (DistanceToTarget < 400.0f)
 		{
+			BBComp->SetValueAsBool(FName("IsInsideHouse"), false);
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 			return; 
 		}
 
-		SeekForce = TargetLocation - Pawn->GetActorLocation();
-		SeekForce.Z = 0.0f;
-		SeekForce.Normalize();
+		if (ASurvivorPawn* Survivor = Cast<ASurvivorPawn>(Pawn))
+		{
+			TArray<FVector> Path = Survivor->CalculatePath(TargetLocation);
+
+			if (Path.Num() > 1)
+				SeekForce = Path[1] - Pawn->GetActorLocation();
+			else
+				SeekForce = TargetLocation - Pawn->GetActorLocation();
+
+			SeekForce.Z = 0.0f;
+			SeekForce.Normalize();
+		}
 	}
 
 // WANDER (Lab: SteeringBehaviors.cpp)
 	WanderAngle += FMath::RandRange(-WanderJitter, WanderJitter) * DeltaSeconds;
 
-	// find center of the circle in front of player
 	FVector ForwardVec = Pawn->GetActorForwardVector();
+	FVector RightVec   = Pawn->GetActorRightVector();
+
 	FVector CircleCenter = ForwardVec * WanderDistance;
 
-	// find displacement point on the circle (Cos/Sin)
-	FVector Displacement(FMath::Cos(WanderAngle), FMath::Sin(WanderAngle), 0.0f);
+	FVector Displacement = (ForwardVec * FMath::Cos(WanderAngle)) + (RightVec * FMath::Sin(WanderAngle));
 	Displacement *= WanderRadius;
 
 	// local wander force
@@ -69,10 +83,41 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 
 	if (NearestZombie)
 	{
-		// Agent Position - Target Position
-		FleeForce = Pawn->GetActorLocation() - NearestZombie->GetActorLocation();
+		FVector ToZombie    = NearestZombie->GetActorLocation() - Pawn->GetActorLocation();
+		float   ZombieDist  = ToZombie.Size2D();
+
+		FleeForce = -ToZombie;
 		FleeForce.Z = 0.0f;
 		FleeForce.Normalize();
+
+		UStudentPerceptor* Perceptor = Pawn->FindComponentByClass<UStudentPerceptor>();
+		bool bIsRunner = BBComp->GetValueAsBool(FName("IsRunnerZombie"));
+
+		// only blend toward a house if it's not a runner and we know one
+		if (!bIsRunner && Perceptor && Perceptor->KnownHouses.Num() > 0)
+		{
+			FVector BestHouse = FVector::ZeroVector;
+			float   MinDist   = 999999.0f;
+
+			for (FVector HouseLoc : Perceptor->KnownHouses)
+			{
+				float Dist = FVector::Dist(Pawn->GetActorLocation(), HouseLoc);
+				if (Dist < MinDist) { MinDist = Dist; BestHouse = HouseLoc; }
+			}
+
+			if (MinDist < 4000.0f)
+			{
+				FVector SeekHouseForce = BestHouse - Pawn->GetActorLocation();
+				SeekHouseForce.Z = 0.0f;
+				SeekHouseForce.Normalize();
+
+				float FleeWeight  = FMath::Lerp(0.4f, 0.85f, FMath::Clamp(1.0f - (ZombieDist / 600.0f), 0.0f, 1.0f));
+				float HouseWeight = 1.0f - FleeWeight;
+
+				FleeForce = (FleeForce * FleeWeight) + (SeekHouseForce * HouseWeight);
+				FleeForce.Normalize();
+			}
+		}
 	}
 
 // OBSTACLE AVOIDANCE
@@ -98,11 +143,11 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		FVector End = Start + (WhiskerDir * Whisker.Distance);
 
 		FHitResult Hit;
-		if (Pawn->GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+		if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
 		{
 			float ProximityRatio = 1.0f - (Hit.Distance / Whisker.Distance);
 			AvoidanceForce += Hit.ImpactNormal * ProximityRatio * 2.5f;
-			DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, -1.0f, 0, 2.0f);
+			DrawDebugLine(World, Start, Hit.ImpactPoint, FColor::Red,   false, -1.0f, 0, 2.0f); // FIX
 		}
 		else
 		{
@@ -116,45 +161,42 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	// what is the goal?
 	if (!FleeForce.IsNearlyZero()) 
 	{
-		DesiredDirection = (FleeForce * 0.8f) + (WanderForce * 0.2f);
-	} 
-	else if (!SeekForce.IsNearlyZero()) 
+		DesiredDirection = (FleeForce * 0.85f) + (WanderForce * 0.15f);
+	}
+	else if (!SeekForce.IsNearlyZero())
 	{
-		DesiredDirection = SeekForce; // door
-	} 
-	else 
+		// inside house, heading for the door
+		DesiredDirection = SeekForce;
+	}
+	else
 	{
 		DesiredDirection = WanderForce; // explore
 	}
 
-	// currently hitting walls?
+	DesiredDirection.Z = 0.0f;
+	DesiredDirection.Normalize();
+
+	// wall sliding
 	if (!AvoidanceForce.IsNearlyZero())
 	{
-		// general direction the walls are pushing
-		FVector WallNormal = AvoidanceForce.GetSafeNormal();
-
-		// project desired direction onto wall to find sliding path
+		FVector WallNormal     = AvoidanceForce.GetSafeNormal();
 		FVector SlideDirection = FVector::VectorPlaneProject(DesiredDirection, WallNormal);
 
-		// are we pushing straight into the wall? (cancel slide)
 		if (SlideDirection.SizeSquared() < 0.1f)
-		{
 			SlideDirection = FVector::CrossProduct(FVector::UpVector, WallNormal);
-		}
 
-		// slide + push away from the wall
 		FinalSteeringForce = SlideDirection + AvoidanceForce;
 	}
 	else
 	{
-		// psth clear
 		FinalSteeringForce = DesiredDirection;
 	}
-	
-	FinalSteeringForce.Z = 0.0f; // Keep on ground
+
+	FinalSteeringForce.Z = 0.0f;
 	FinalSteeringForce.Normalize();
-	
-// SPRINTING (Energy Management)
+
+
+// SPRINTING  (stamina-aware)
 	if (ASurvivorPawn* Survivor = Cast<ASurvivorPawn>(Pawn))
 	{
 		bool bShouldSprint = false;
@@ -165,42 +207,29 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 			bool bIsHeavy = BBComp->GetValueAsBool(FName("IsHeavyZombie"));
 			bool bIsRunner = BBComp->GetValueAsBool(FName("IsRunnerZombie"));
 			bool bIsInPurgeZone = BBComp->GetValueAsBool(FName("IsInPurgeZone"));
-			
-			// away from fast/strong zombies and purge zones
+
 			if (bIsHeavy || bIsRunner || bIsInPurgeZone)
-			{
 				bShouldSprint = true;
-			}
 		}
 
-		// have stamina to sprint?
 		if (UStaminaComponent* StaminaComp = Survivor->FindComponentByClass<UStaminaComponent>())
 		{
 			if (StaminaComp->GetCurrentStamina() <= 0.0f)
-			{
-				bShouldSprint = false; // nopes
-			}
+				bShouldSprint = false;
 		}
 
-		if (bShouldSprint)
-		{
-			Survivor->StartRunning();
-		}
-		else
-		{
-			Survivor->StopRunning();
-		}
+		if (bShouldSprint) Survivor->StartRunning();
+		else               Survivor->StopRunning();
 	}
-	
-// APPLY TO UNREAL - Now (after feedback) instead of using MoveTo in the BT, we add the steering into pawn
+
+// APPLY MOVEMENT
 	Pawn->AddMovementInput(FinalSteeringForce, 1.0f);
 
-	// rotate player to face where its going
 	if (!FinalSteeringForce.IsNearlyZero())
 	{
 		FRotator CurrentRot = Pawn->GetActorRotation();
-		FRotator TargetRot = FinalSteeringForce.Rotation();
-		FRotator SmoothRot = FMath::RInterpTo(CurrentRot, TargetRot, DeltaSeconds, 8.0f);
+		FRotator TargetRot  = FinalSteeringForce.Rotation();
+		FRotator SmoothRot  = FMath::RInterpTo(CurrentRot, TargetRot, DeltaSeconds, 8.0f);
 		Pawn->SetActorRotation(SmoothRot);
 	}
 }

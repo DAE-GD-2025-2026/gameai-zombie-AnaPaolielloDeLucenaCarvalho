@@ -11,15 +11,14 @@ UUBTT_SaveDoorway::UUBTT_SaveDoorway()
 
 EBTNodeResult::Type UUBTT_SaveDoorway::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
 	UBlackboardComponent* BBComp = OwnerComp.GetBlackboardComponent();
-	if (!Pawn || !BBComp) return EBTNodeResult::Failed;
+	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
+	if (!BBComp || !Pawn) return EBTNodeResult::Failed;
 
-	// Blacklist the house
 	UStudentPerceptor* Perceptor = Pawn->FindComponentByClass<UStudentPerceptor>();
-	UObject* HouseObj = BBComp->GetValueAsObject(FName("NearestHouse"));
-	if (Perceptor && HouseObj) {
-		Perceptor->VisitedHouses.AddUnique(Cast<AHouse>(HouseObj));
+	AHouse* HouseToEnter = Cast<AHouse>(BBComp->GetValueAsObject(FName("NearestHouse")));
+	if (Perceptor && HouseToEnter) {
+		Perceptor->VisitedHouses.AddUnique(HouseToEnter);
 	}
 
 	BBComp->SetValueAsVector(FName("TargetLocation"), Pawn->GetActorLocation());
