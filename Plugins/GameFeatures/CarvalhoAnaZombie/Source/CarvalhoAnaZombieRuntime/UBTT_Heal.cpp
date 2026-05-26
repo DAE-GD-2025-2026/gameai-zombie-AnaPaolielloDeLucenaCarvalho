@@ -10,25 +10,41 @@ UUBTT_Heal::UUBTT_Heal()
 
 EBTNodeResult::Type UUBTT_Heal::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
-	AAIController* AIController = OwnerComp.GetAIOwner();
-	if (!AIController) return EBTNodeResult::Failed;
-
-	APawn* Pawn = AIController->GetPawn();
+	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
 	if (!Pawn) return EBTNodeResult::Failed;
-
+ 
 	UInventoryComponent* InventoryComp = Pawn->FindComponentByClass<UInventoryComponent>();
+	UHealthComponent*    HealthComp    = Pawn->FindComponentByClass<UHealthComponent>();
 	if (!InventoryComp) return EBTNodeResult::Failed;
-
+ 
+	bool bHealed = false;
+ 
+	// loop through all medkits to keep healing until health is full/no more medkit
 	TArray<ABaseItem*> Backpack = InventoryComp->GetInventory();
-
 	for (int i = 0; i < Backpack.Num(); ++i)
 	{
-		if (Backpack[i] && Cast<AMedkit>(Backpack[i]))
+		AMedkit* Medkit = Cast<AMedkit>(Backpack[i]);
+		if (!Medkit) continue;
+ 
+		while (Medkit && Medkit->GetValue() > 0)
 		{
+			if (HealthComp && HealthComp->GetHealth() >= HealthComp->GetMaxHealth())
+				break;
+ 
 			InventoryComp->UseItem(i);
-			//InventoryComp->RemoveItem(i);
-			return EBTNodeResult::Succeeded;
+			bHealed = true;
+ 
+			if (Medkit->GetValue() <= 0)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, TEXT("Medkit empty — discarding."));
+				InventoryComp->RemoveItem(i);
+				break;
+			}
 		}
+ 
+		if (HealthComp && HealthComp->GetHealth() >= HealthComp->GetMaxHealth())
+			break;
 	}
-	return EBTNodeResult::Failed;
+ 
+	return bHealed ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
 }

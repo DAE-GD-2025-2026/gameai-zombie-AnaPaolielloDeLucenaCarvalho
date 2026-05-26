@@ -8,18 +8,40 @@ UUBTT_EatFood::UUBTT_EatFood() { NodeName = "Eat Food"; }
 EBTNodeResult::Type UUBTT_EatFood::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
+	if (!Pawn) return EBTNodeResult::Failed;
+ 
 	UInventoryComponent* InventoryComp = Pawn->FindComponentByClass<UInventoryComponent>();
+	UStaminaComponent*   StaminaComp   = Pawn->FindComponentByClass<UStaminaComponent>();
 	if (!InventoryComp) return EBTNodeResult::Failed;
-
+ 
+	bool bAtedSomething = false;
+ 
+	// loop through all food and keep eating until stamina is full/no more food
 	TArray<ABaseItem*> Backpack = InventoryComp->GetInventory();
 	for (int i = 0; i < Backpack.Num(); ++i)
 	{
-		if (Backpack[i] && Cast<AFood>(Backpack[i]))
+		AFood* Food = Cast<AFood>(Backpack[i]);
+		if (!Food) continue;
+ 
+		while (Food && Food->GetValue() > 0)
 		{
+			if (StaminaComp && StaminaComp->GetCurrentStamina() >= StaminaComp->GetMaxStamina())
+				break;
+ 
 			InventoryComp->UseItem(i);
-			//InventoryComp->RemoveItem(i); // eat and throw away
-			return EBTNodeResult::Succeeded;
+			bAtedSomething = true;
+ 
+			if (Food->GetValue() <= 0)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 2.f, FColor::Yellow, TEXT("Food empty — discarding."));
+				InventoryComp->RemoveItem(i);
+				break;
+			}
 		}
+ 
+		if (StaminaComp && StaminaComp->GetCurrentStamina() >= StaminaComp->GetMaxStamina())
+			break;
 	}
-	return EBTNodeResult::Failed;
+ 
+	return bAtedSomething ? EBTNodeResult::Succeeded : EBTNodeResult::Failed;
 }

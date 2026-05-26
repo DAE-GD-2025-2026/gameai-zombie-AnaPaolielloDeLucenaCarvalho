@@ -11,6 +11,18 @@ class CARVALHOANAZOMBIERUNTIME_API UUBTT_BlendedSteer : public UBTTaskNode
 
 public:
 	UUBTT_BlendedSteer();
+	
+	UPROPERTY(EditAnywhere, Category = "Wander")
+	float WanderUpdateInterval = 1.5f;
+
+	UPROPERTY(EditAnywhere, Category = "Wander")
+	float WanderDistance = 150.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Wander")
+	float WanderRadius = 80.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Wander")
+	float WanderJitter = 1.0f;  
 
 protected:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
@@ -18,7 +30,6 @@ protected:
 
 private:
 	float WanderAngle = 0.0f;
-	float WanderDistance = 500.0f;
-	float WanderRadius = 300.0f;
-	float WanderJitter = 50.0f; 
+	float WanderTargetAngle = 0.0f;
+	float WanderTimer = 0.0f;
 };
