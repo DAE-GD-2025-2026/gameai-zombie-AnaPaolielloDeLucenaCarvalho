@@ -5,6 +5,7 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "Survivor/SurvivorPawn.h"
 #include "Common/StaminaComponent.h"
+#include "Village/House/House.h"
 
 UUBTT_BlendedSteer::UUBTT_BlendedSteer()
 {
@@ -31,27 +32,41 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	if (!World) return;
 
 	FVector FinalSteeringForce = FVector::ZeroVector;
-
-// EXIT HOUSE
 	FVector SeekForce = FVector::ZeroVector;
 
-	if (BBComp->GetValueAsBool(FName("IsInsideHouse")))
+// SEEK ITEM
+	AActor* NearestItem = Cast<AActor>(BBComp->GetValueAsObject("NearestItem"));
+	if (NearestItem)
 	{
-		FVector Doorway = BBComp->GetValueAsVector(FName("DoorwayLocation"));
-		float   DistToDoorway = FVector::Dist2D(Pawn->GetActorLocation(), Doorway);
-
-		if (DistToDoorway < 400.0f)
+		FVector ToItem = NearestItem->GetActorLocation() - Pawn->GetActorLocation();
+    
+		// close enough to the item = pickup
+		if (ToItem.Size2D() < 100.0f) 
 		{
-			BBComp->SetValueAsBool(FName("IsInsideHouse"), false);
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 			return;
 		}
 
-		if (ASurvivorPawn* Survivor = Cast<ASurvivorPawn>(Pawn))
+		SeekForce = ToItem;
+		SeekForce.Z = 0.0f;
+		SeekForce.Normalize();
+	}
+// SEEK HOUSE
+	else if (!BBComp->GetValueAsBool(FName("IsInsideHouse")))
+	{
+		AActor* NearestHouse = Cast<AActor>(BBComp->GetValueAsObject("NearestHouse"));
+		if (NearestHouse)
 		{
-			TArray<FVector> Path = Survivor->CalculatePath(Doorway);
-			SeekForce = (Path.Num() > 1) ? Path[1] - Pawn->GetActorLocation()
-			                              : Doorway  - Pawn->GetActorLocation();
+			FVector ToHouse = NearestHouse->GetActorLocation() - Pawn->GetActorLocation();
+        
+			// close enough to the house = SaveDoorway
+			if (ToHouse.Size2D() < 150.0f) 
+			{
+				FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+				return;
+			}
+        
+			SeekForce = ToHouse;
 			SeekForce.Z = 0.0f;
 			SeekForce.Normalize();
 		}
@@ -148,6 +163,31 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		}
 	}
 
+// HOUSE CONTAINMENT (Using House's GetBounds)
+	if (BBComp->GetValueAsBool(FName("IsInsideHouse")))
+	{
+		AHouse* CurrentHouse = Cast<AHouse>(BBComp->GetValueAsObject("NearestHouse"));
+		if (CurrentHouse)
+		{
+			FHouseBounds Bounds = CurrentHouse->GetBounds();
+			FVector PawnLoc = Pawn->GetActorLocation();
+
+			// get walls
+			float MinX = Bounds.Origin.X - Bounds.Extent.X;
+			float MaxX = Bounds.Origin.X + Bounds.Extent.X;
+			float MinY = Bounds.Origin.Y - Bounds.Extent.Y;
+			float MaxY = Bounds.Origin.Y + Bounds.Extent.Y;
+
+			float Margin = 120.0f;
+
+			// force if too close
+			if (PawnLoc.X < MinX + Margin) AvoidanceForce.X += 1.0f;
+			if (PawnLoc.X > MaxX - Margin) AvoidanceForce.X -= 1.0f;
+			if (PawnLoc.Y < MinY + Margin) AvoidanceForce.Y += 1.0f;
+			if (PawnLoc.Y > MaxY - Margin) AvoidanceForce.Y -= 1.0f;
+		}
+	}
+	
 // BLEND FORCES  (Lab: CombinedSteeringBehaviors.cpp)
 	FVector DesiredDirection;
 
