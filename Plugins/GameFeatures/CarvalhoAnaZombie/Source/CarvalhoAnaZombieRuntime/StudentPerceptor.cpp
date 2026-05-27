@@ -149,7 +149,11 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 		else
 		{
 			// not needed, save to memory
-			KnownItems.AddUnique(SeenWeapon);
+			if (!KnownItems.Contains(SeenWeapon))
+			{
+				KnownItems.AddUnique(SeenWeapon);
+				GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Purple, FString::Printf(TEXT("MEMORY SAVED: Don't need %s right now. Saving location!"), *SeenWeapon->GetName()));
+			}
 		}
 	}
 	else if (ABaseItem* SeenItem = Cast<ABaseItem>(Actor)) // -> is a Medkit / Food / Garbage? (Seeking logic)
@@ -169,7 +173,11 @@ void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 		else
 		{
 			// no space, save to memory
-			KnownItems.AddUnique(SeenItem);
+			if (!KnownItems.Contains(SeenItem))
+			{
+				KnownItems.AddUnique(SeenItem);
+				GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Purple, FString::Printf(TEXT("MEMORY SAVED: Don't need %s right now. Saving location!"), *SeenWeapon->GetName()));
+			}
 		}
 	}
 	

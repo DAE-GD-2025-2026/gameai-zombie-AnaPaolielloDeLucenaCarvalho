@@ -154,8 +154,8 @@ void UBTService_UpdateStats::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* 
 		if (BestMemoryItem)
 		{
 			BlackboardComp->SetValueAsObject(FName("NearestItem"), BestMemoryItem);
-			GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Cyan, TEXT("Remembered an item! Going back for it!"));
-                
+			GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor::Cyan, FString::Printf(TEXT("MEMORY RETRIEVED: I need a %s! Going back to get it!"), *BestMemoryItem->GetName()));   
+			
 			Perceptor->KnownItems.Remove(BestMemoryItem);
 		}
 	}

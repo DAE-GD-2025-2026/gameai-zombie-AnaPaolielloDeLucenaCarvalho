@@ -5,6 +5,7 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "Survivor/SurvivorPawn.h"
 #include "Common/StaminaComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Village/House/House.h"
 
 UUBTT_BlendedSteer::UUBTT_BlendedSteer()
@@ -71,22 +72,46 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 			SeekForce.Normalize();
 		}
 	}
+// SEEK DOORWAY
+	bool bIsInside = BBComp->GetValueAsBool(FName("IsInsideHouse"));
+	FVector DoorwayLoc = BBComp->GetValueAsVector(FName("DoorwayLocation"));
+	AActor* NearestZombie = Cast<AActor>(BBComp->GetValueAsObject("NearestZombie"));
+
+	if (bIsInside && !NearestItem) 
+	{
+		FVector ToDoor = DoorwayLoc - Pawn->GetActorLocation();
+        
+		if (ToDoor.Size2D() < 120.0f)
+		{
+			BBComp->SetValueAsBool(FName("IsInsideHouse"), false);
+			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
+			return;
+		}
+
+		SeekForce = ToDoor;
+		SeekForce.Z = 0.0f;
+		SeekForce.Normalize();
+	}
 
 // WANDER  (Lab: SteeringBehaviors.cpp)
 	WanderTimer += DeltaSeconds;
-	if (WanderTimer >= WanderUpdateInterval)
+	
+	if (WanderTimer >= 0.5f)
 	{
 		WanderTimer        = 0.0f;
 		WanderTargetAngle  = FMath::RandRange(-PI, PI); // pick a new direction
 	}
 
-	// rotate toward angle
-	WanderAngle = FMath::FInterpTo(WanderAngle, WanderTargetAngle, DeltaSeconds, 2.5f);
+	WanderAngle = FMath::FInterpTo(WanderAngle, WanderTargetAngle, DeltaSeconds, 1.0f);
 
 	FVector ForwardVec   = Pawn->GetActorForwardVector();
 	FVector RightVec     = Pawn->GetActorRightVector();
-	FVector CircleCenter = ForwardVec * WanderDistance;
-	FVector Displacement = (RightVec * FMath::Cos(WanderAngle) + ForwardVec * FMath::Sin(WanderAngle)) * WanderRadius;
+	
+	float SafeWanderDistance = 400.0f; 
+	float SafeWanderRadius = 150.0f;   
+
+	FVector CircleCenter = ForwardVec * SafeWanderDistance;
+	FVector Displacement = (RightVec * FMath::Cos(WanderAngle) + ForwardVec * FMath::Sin(WanderAngle)) * SafeWanderRadius;
 
 	FVector WanderForce = (CircleCenter + Displacement);
 	WanderForce.Z = 0.0f;
@@ -94,7 +119,6 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 
 // FLEE  (Lab: SteeringBehaviors.cpp)
 	FVector FleeForce    = FVector::ZeroVector;
-	AActor* NearestZombie = Cast<AActor>(BBComp->GetValueAsObject("NearestZombie"));
 
 	if (NearestZombie)
 	{
@@ -131,15 +155,18 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 
 // OBSTACLE AVOIDANCE  (whisker raycasts)
 	FVector AvoidanceForce = FVector::ZeroVector;
-	FVector Start          = Pawn->GetActorLocation();
-	FVector Forward        = Pawn->GetActorForwardVector();
+	FVector Start = Pawn->GetActorLocation();
+	FVector Forward = Pawn->GetActorForwardVector();
+
+	bool bSeekingItem = (NearestItem != nullptr);
+	float WhiskerScale = (bSeekingItem && bIsInside) ? 1.2f : 1.75f;
 
 	struct FWhisker { float Angle; float Distance; };
 	const FWhisker Whiskers[] =
 	{
-		{ -45.0f,  75.0f }, // Left
-		{   0.0f, 100.0f }, // Centre
-		{  45.0f,  75.0f } // Right
+		{ -45.0f,  75.0f * WhiskerScale }, // Left
+		{   0.0f,  100.0f  * WhiskerScale }, // Centre
+		{  45.0f,  75.0f  * WhiskerScale }  // Right
 	};
 
 	FCollisionQueryParams Params;
@@ -153,8 +180,15 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		FHitResult Hit;
 		if (World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
 		{
-			float Proximity = 1.0f - Hit.Distance / W.Distance;
-			AvoidanceForce += Hit.ImpactNormal * Proximity * 2.5f;
+			float Proximity = 1.0f - (Hit.Distance / W.Distance);
+			
+			AvoidanceForce += Hit.ImpactNormal * Proximity * 5.0f;
+
+			if (W.Angle == 0.0f)
+			{
+				AvoidanceForce += Pawn->GetActorRightVector() * Proximity * 4.0f;
+			}
+
 			DrawDebugLine(World, Start, Hit.ImpactPoint, FColor::Red, false, -1.0f, 0, 2.0f);
 		}
 		else
@@ -163,8 +197,15 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		}
 	}
 
-// HOUSE CONTAINMENT (Using House's GetBounds)
-	if (BBComp->GetValueAsBool(FName("IsInsideHouse")))
+// HOUSE CONTAINMENT (Inside Only)
+	bool bAvoidWalls = true;
+	
+	if (bIsInside && !NearestItem)
+	{
+		bAvoidWalls = false;
+	}
+
+	if (bIsInside && bAvoidWalls)
 	{
 		AHouse* CurrentHouse = Cast<AHouse>(BBComp->GetValueAsObject("NearestHouse"));
 		if (CurrentHouse)
@@ -192,11 +233,11 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 	FVector DesiredDirection;
 
 	if (!FleeForce.IsNearlyZero())
-		DesiredDirection = (FleeForce * 0.85f) + (WanderForce * 0.15f); // flee with slight wander so it doesn't run in a straight line
+		DesiredDirection = (FleeForce * 0.85f) + (WanderForce * 0.15f); 
 	else if (!SeekForce.IsNearlyZero())
-		DesiredDirection = SeekForce; // heading for doorway
+		DesiredDirection = SeekForce; 
 	else
-		DesiredDirection = WanderForce; // free explore
+		DesiredDirection = WanderForce; 
 
 	DesiredDirection.Z = 0.0f;
 	DesiredDirection.Normalize();
@@ -209,7 +250,9 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		if (SlideDirection.SizeSquared() < 0.1f)
 			SlideDirection = FVector::CrossProduct(FVector::UpVector, WallNormal);
 
-		FinalSteeringForce = (SlideDirection + AvoidanceForce);
+		SlideDirection.Normalize();
+
+		FinalSteeringForce = (SlideDirection * 0.7f) + (WallNormal * 0.3f);
 	}
 	else
 	{
