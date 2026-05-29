@@ -5,12 +5,12 @@
 #include "UBTT_BlendedSteer.generated.h"
 
 UCLASS()
-class CARVALHOANAZOMBIERUNTIME_API UUBTT_BlendedSteer : public UBTTaskNode
+class CARVALHOANAZOMBIERUNTIME_API UUBTT_BlendedSteerCarvalhoAna : public UBTTaskNode
 {
 	GENERATED_BODY()
 
 public:
-	UUBTT_BlendedSteer();
+	UUBTT_BlendedSteerCarvalhoAna();
 	
 	UPROPERTY(EditAnywhere, Category = "Wander")
 	float WanderUpdateInterval = 1.5f;

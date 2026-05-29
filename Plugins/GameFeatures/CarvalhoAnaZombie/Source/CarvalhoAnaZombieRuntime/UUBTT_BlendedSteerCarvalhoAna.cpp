@@ -10,13 +10,13 @@
 #include "NavigationSystem.h"
 #include "NavMesh/NavMeshPath.h"
 
-UUBTT_BlendedSteer::UUBTT_BlendedSteer()
+UUBTT_BlendedSteerCarvalhoAna::UUBTT_BlendedSteerCarvalhoAna()
 {
 	NodeName = "Blended Steering (Lab Math)";
 	bNotifyTick = true; // run every frame
 }
 
-EBTNodeResult::Type UUBTT_BlendedSteer::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_BlendedSteerCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	WanderTimer = WanderUpdateInterval;
 	
@@ -31,7 +31,7 @@ EBTNodeResult::Type UUBTT_BlendedSteer::ExecuteTask(UBehaviorTreeComponent& Owne
 	return EBTNodeResult::InProgress;
 }
 
-void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
 	AAIController* AIController = OwnerComp.GetAIOwner();
 	UBlackboardComponent* BBComp = OwnerComp.GetBlackboardComponent();
@@ -208,7 +208,7 @@ void UUBTT_BlendedSteer::TickTask(UBehaviorTreeComponent& OwnerComp, uint8* Node
 		FleeForce.Z = 0.0f;
 		FleeForce.Normalize();
 
-		UStudentPerceptor* Perceptor = Pawn->FindComponentByClass<UStudentPerceptor>();
+		UStudentPerceptorCarvalhoAna* Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
 		bool bIsRunner = BBComp->GetValueAsBool(FName("IsRunnerZombie"));
 
 		// not a runner zombie - flee + toward the nearest known house

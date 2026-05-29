@@ -1,14 +1,17 @@
 ﻿#pragma once
+
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_SaveDoorway.generated.h"
+#include "UBTT_PickupItem.generated.h"
 
 UCLASS()
-class CARVALHOANAZOMBIERUNTIME_API UUBTT_SaveDoorway : public UBTTaskNode
+class CARVALHOANAZOMBIERUNTIME_API UUBTT_PickupItemCarvalhoAna : public UBTTaskNode
 {
 	GENERATED_BODY()
+
 public:
-	UUBTT_SaveDoorway();
+	UUBTT_PickupItemCarvalhoAna();
+
 protected:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 };

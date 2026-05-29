@@ -4,18 +4,18 @@
 #include "StudentPerceptor.h"
 #include "Village/House/House.h"
 
-UUBTT_SaveDoorway::UUBTT_SaveDoorway() 
+UUBTT_SaveDoorwayCarvalhoAna::UUBTT_SaveDoorwayCarvalhoAna() 
 { 
 	NodeName = "Blacklist House"; 
 }
 
-EBTNodeResult::Type UUBTT_SaveDoorway::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_SaveDoorwayCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	UBlackboardComponent* BBComp = OwnerComp.GetBlackboardComponent();
 	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
 	if (!BBComp || !Pawn) return EBTNodeResult::Failed;
  
-	UStudentPerceptor* Perceptor    = Pawn->FindComponentByClass<UStudentPerceptor>();
+	UStudentPerceptorCarvalhoAna* Perceptor    = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
 	AHouse*            HouseToEnter = Cast<AHouse>(BBComp->GetValueAsObject(FName("NearestHouse")));
 	if (Perceptor && HouseToEnter)
 		Perceptor->VisitedHouses.AddUnique(HouseToEnter);

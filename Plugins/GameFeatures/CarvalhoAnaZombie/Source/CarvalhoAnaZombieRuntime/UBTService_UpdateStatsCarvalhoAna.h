@@ -5,12 +5,12 @@
 #include "UBTService_UpdateStats.generated.h"
 
 UCLASS()
-class CARVALHOANAZOMBIERUNTIME_API UBTService_UpdateStats : public UBTService
+class CARVALHOANAZOMBIERUNTIME_API UBTService_UpdateStatsCarvalhoAna : public UBTService
 {
 	GENERATED_BODY()
 
 public:
-	UBTService_UpdateStats();
+	UBTService_UpdateStatsCarvalhoAna();
 
 protected:
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;

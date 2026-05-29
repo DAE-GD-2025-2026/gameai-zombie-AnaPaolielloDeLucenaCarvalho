@@ -1,14 +1,15 @@
 ﻿#pragma once
+
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_ShootWeapon.generated.h"
+#include "UBTT_EatFood.generated.h"
 
 UCLASS()
-class CARVALHOANAZOMBIERUNTIME_API UUBTT_ShootWeapon : public UBTTaskNode
+class CARVALHOANAZOMBIERUNTIME_API UUBTT_EatFoodCarvalhoAna : public UBTTaskNode
 {
 	GENERATED_BODY()
 public:
-	UUBTT_ShootWeapon();
+	UUBTT_EatFoodCarvalhoAna();
 protected:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
 };

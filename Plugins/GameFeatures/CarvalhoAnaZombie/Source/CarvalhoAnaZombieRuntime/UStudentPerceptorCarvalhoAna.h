@@ -14,13 +14,13 @@ class ABaseItem;
 class AHouse;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class CARVALHOANAZOMBIERUNTIME_API UStudentPerceptor : public UActorComponent
+class CARVALHOANAZOMBIERUNTIME_API UStudentPerceptorCarvalhoAna : public UActorComponent
 {
 	GENERATED_BODY()
 
 public:
 	// Sets default values for this component's properties
-	UStudentPerceptor();
+	UStudentPerceptorCarvalhoAna();
 	
 	virtual void BeginPlay() override;
 

@@ -16,22 +16,22 @@
 #include "Common/InventoryComponent.h"
 
 
-UStudentPerceptor::UStudentPerceptor()
+UStudentPerceptorCarvalhoAna::UStudentPerceptorCarvalhoAna()
 {
 	PrimaryComponentTick.bCanEverTick = true;
 }
 
-void UStudentPerceptor::BeginPlay()
+void UStudentPerceptorCarvalhoAna::BeginPlay()
 {
 	Super::BeginPlay();
 	
 	if (auto PerceptionComp = GetOwner()->GetComponentByClass<UAIPerceptionComponent>())
 	{
-		PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &UStudentPerceptor::OnPerceptionUpdated);
+		PerceptionComp->OnTargetPerceptionUpdated.AddDynamic(this, &UStudentPerceptorCarvalhoAna::OnPerceptionUpdated);
 	}
 }
 
-void UStudentPerceptor::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
+void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	//GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green, FString::Printf(TEXT("Saw Something!")));
 	

@@ -2,9 +2,9 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/Actor.h"
 
-UUBTT_SetTargetToItem::UUBTT_SetTargetToItem() { NodeName = "Set Target To Nearest Item"; }
+UUBTT_SetTargetToItemCarvalhoAna::UUBTT_SetTargetToItemCarvalhoAna() { NodeName = "Set Target To Nearest Item"; }
 
-EBTNodeResult::Type UUBTT_SetTargetToItem::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_SetTargetToItemCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	UBlackboardComponent* BB = OwnerComp.GetBlackboardComponent();
 	if (!BB) return EBTNodeResult::Failed;

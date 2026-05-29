@@ -3,9 +3,9 @@
 #include "Common/InventoryComponent.h"
 #include "Items/Food.h"
 
-UUBTT_EatFood::UUBTT_EatFood() { NodeName = "Eat Food"; }
+UUBTT_EatFoodCarvalhoAna::UUBTT_EatFoodCarvalhoAna() { NodeName = "Eat Food"; }
 
-EBTNodeResult::Type UUBTT_EatFood::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_EatFoodCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
 	if (!Pawn) return EBTNodeResult::Failed;

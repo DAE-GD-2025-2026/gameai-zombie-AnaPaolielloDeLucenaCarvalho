@@ -12,13 +12,13 @@
 #include "Kismet/GameplayStatics.h"
 #include "Zombies/BaseZombie.h"
 
-UBTService_UpdateStats::UBTService_UpdateStats()
+UBTService_UpdateStatsCarvalhoAna::UBTService_UpdateStatsCarvalhoAna()
 {
 	NodeName = "Update Survivor Stats";
 	bNotifyTick = true;
 }
 
-void UBTService_UpdateStats::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
+void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds)
 {
 	Super::TickNode(OwnerComp, NodeMemory, DeltaSeconds);
 
@@ -110,7 +110,7 @@ void UBTService_UpdateStats::TickNode(UBehaviorTreeComponent& OwnerComp, uint8* 
 	}
 	
 	// memory retrival
-	UStudentPerceptor* Perceptor = SurvivorPawn->FindComponentByClass<UStudentPerceptor>();
+	UStudentPerceptorCarvalhoAna* Perceptor = SurvivorPawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
 	UObject* CurrentTargetItem = BlackboardComp->GetValueAsObject(FName("NearestItem"));
         
 	// search memory if not walking towards an item

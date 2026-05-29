@@ -3,12 +3,12 @@
 #include "Common/InventoryComponent.h"
 #include "Items/Weapon.h"
 
-UUBTT_ShootWeapon::UUBTT_ShootWeapon()
+UUBTT_ShootWeaponCarvalhoAna::UUBTT_ShootWeaponCarvalhoAna()
 {
 	NodeName = "Shoot Weapon";
 }
 
-EBTNodeResult::Type UUBTT_ShootWeapon::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_ShootWeaponCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	AAIController* AIController = OwnerComp.GetAIOwner();
 	if (!AIController) return EBTNodeResult::Failed;

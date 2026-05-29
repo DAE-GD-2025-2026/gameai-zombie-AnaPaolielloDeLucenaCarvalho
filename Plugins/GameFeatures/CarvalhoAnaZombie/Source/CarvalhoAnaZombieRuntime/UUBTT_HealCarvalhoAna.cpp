@@ -3,12 +3,12 @@
 #include "Common/InventoryComponent.h"
 #include "Items/Medkit.h"
 
-UUBTT_Heal::UUBTT_Heal()
+UUBTT_HealCarvalhoAna::UUBTT_HealCarvalhoAna()
 {
 	NodeName = "Use Medkit";
 }
 
-EBTNodeResult::Type UUBTT_Heal::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_HealCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
 	if (!Pawn) return EBTNodeResult::Failed;

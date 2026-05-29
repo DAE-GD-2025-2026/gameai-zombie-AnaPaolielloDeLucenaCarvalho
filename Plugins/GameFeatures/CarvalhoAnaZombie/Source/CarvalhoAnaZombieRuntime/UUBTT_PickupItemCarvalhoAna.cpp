@@ -4,12 +4,12 @@
 #include "Common/InventoryComponent.h"
 #include "Items/BaseItem.h"
 
-UUBTT_PickupItem::UUBTT_PickupItem()
+UUBTT_PickupItemCarvalhoAna::UUBTT_PickupItemCarvalhoAna()
 {
 	NodeName = "Pickup Nearest Item";
 }
 
-EBTNodeResult::Type UUBTT_PickupItem::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
+EBTNodeResult::Type UUBTT_PickupItemCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	// get brain and blackboard
 	AAIController* AIController = OwnerComp.GetAIOwner();
