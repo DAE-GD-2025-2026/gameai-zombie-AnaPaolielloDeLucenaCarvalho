@@ -1,8 +1,8 @@
-﻿#include "UBTService_UpdateStats.h"
+﻿#include "UBTService_UpdateStatsCarvalhoAna.h"
 #include "BehaviorTree/BlackboardComponent.h"
 
 #include "AIController.h"
-#include "StudentPerceptor.h"
+#include "UStudentPerceptorCarvalhoAna.h"
 #include "Common/HealthComponent.h"
 #include "Common/InventoryComponent.h"
 #include "Items/Weapon.h"

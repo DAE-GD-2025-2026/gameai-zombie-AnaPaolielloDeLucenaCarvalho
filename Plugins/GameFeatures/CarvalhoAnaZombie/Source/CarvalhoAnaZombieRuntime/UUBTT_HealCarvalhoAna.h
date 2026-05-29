@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_Heal.generated.h"
+#include "UUBTT_HealCarvalhoAna.generated.h"
 
 UCLASS()
 class CARVALHOANAZOMBIERUNTIME_API UUBTT_HealCarvalhoAna : public UBTTaskNode

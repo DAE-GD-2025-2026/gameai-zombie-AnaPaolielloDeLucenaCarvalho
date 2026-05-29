@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_PickupItem.generated.h"
+#include "UUBTT_PickupItemCarvalhoAna.generated.h"
 
 UCLASS()
 class CARVALHOANAZOMBIERUNTIME_API UUBTT_PickupItemCarvalhoAna : public UBTTaskNode

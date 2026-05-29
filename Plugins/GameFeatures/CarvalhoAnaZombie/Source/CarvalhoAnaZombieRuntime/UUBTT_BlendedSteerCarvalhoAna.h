@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_BlendedSteer.generated.h"
+#include "UUBTT_BlendedSteerCarvalhoAna.generated.h"
 
 UCLASS()
 class CARVALHOANAZOMBIERUNTIME_API UUBTT_BlendedSteerCarvalhoAna : public UBTTaskNode

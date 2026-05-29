@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_SetTargetToItem.generated.h"
+#include "UUBTT_SetTargetToItemCarvalhoAna.generated.h"
 
 UCLASS()
 class CARVALHOANAZOMBIERUNTIME_API UUBTT_SetTargetToItemCarvalhoAna : public UBTTaskNode

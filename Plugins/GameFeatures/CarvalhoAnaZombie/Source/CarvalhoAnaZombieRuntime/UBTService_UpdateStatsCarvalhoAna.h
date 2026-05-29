@@ -2,7 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTService.h"
-#include "UBTService_UpdateStats.generated.h"
+#include "UBTService_UpdateStatsCarvalhoAna.generated.h"
 
 UCLASS()
 class CARVALHOANAZOMBIERUNTIME_API UBTService_UpdateStatsCarvalhoAna : public UBTService

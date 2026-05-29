@@ -1,7 +1,7 @@
 ﻿#pragma once
 #include "CoreMinimal.h"
 #include "BehaviorTree/BTTaskNode.h"
-#include "UBTT_ClearMemory.generated.h"
+#include "UUBTT_ClearMemoryCarvalhoAna.generated.h"
 
 UCLASS()
 class CARVALHOANAZOMBIERUNTIME_API UUBTT_ClearMemoryCarvalhoAna : public UBTTaskNode

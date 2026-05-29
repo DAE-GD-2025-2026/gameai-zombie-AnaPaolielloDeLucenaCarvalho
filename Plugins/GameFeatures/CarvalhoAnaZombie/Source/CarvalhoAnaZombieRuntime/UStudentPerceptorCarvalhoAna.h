@@ -8,7 +8,7 @@
 #include "Perception/AISenseConfig_Sight.h"
 #include "Perception/AISenseConfig_Damage.h"
 #include "Perception/AISense_Damage.h"
-#include "StudentPerceptor.generated.h"
+#include "UStudentPerceptorCarvalhoAna.generated.h"
 
 class ABaseItem;
 class AHouse;

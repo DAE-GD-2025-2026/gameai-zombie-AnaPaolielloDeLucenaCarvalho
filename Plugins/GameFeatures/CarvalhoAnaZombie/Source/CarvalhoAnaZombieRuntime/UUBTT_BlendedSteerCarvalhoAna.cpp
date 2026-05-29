@@ -1,6 +1,6 @@
-﻿#include "UBTT_BlendedSteer.h"
+﻿#include "UUBTT_BlendedSteerCarvalhoAna.h"
 #include "AIController.h"
-#include "StudentPerceptor.h"
+#include "UStudentPerceptorCarvalhoAna.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
 #include "Survivor/SurvivorPawn.h"
