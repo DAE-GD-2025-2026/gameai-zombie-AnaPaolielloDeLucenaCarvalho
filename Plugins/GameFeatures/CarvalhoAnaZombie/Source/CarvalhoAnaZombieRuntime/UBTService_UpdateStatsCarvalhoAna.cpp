@@ -41,7 +41,7 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 		// have we taken damage since the last tick (since DAMAGE SENSE in student perceptor didnt work)
 		if (NewHealth < OldHealth && OldHealth > 0.0f)
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH!"));
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH!"));
 
 			// search for all zombies
 			TArray<AActor*> FoundZombies;
@@ -154,9 +154,82 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 		if (BestMemoryItem)
 		{
 			BlackboardComp->SetValueAsObject(FName("NearestItem"), BestMemoryItem);
-			GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor::Cyan, FString::Printf(TEXT("MEMORY RETRIEVED: I need a %s! Going back to get it!"), *BestMemoryItem->GetName()));   
+            
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor::Cyan, FString::Printf(TEXT("[MEMORY] Retrieved target: %s"), *BestMemoryItem->GetName()));
+			}
 			
 			Perceptor->KnownItems.Remove(BestMemoryItem);
+		}
+	}
+
+	// Damians idea - see what state is happening
+
+	FString AIStateText = TEXT("WANDER");
+
+	float CurHealth = BlackboardComp->GetValueAsFloat(FName("CurrentHealth"));
+	float CurStamina = BlackboardComp->GetValueAsFloat(FName("CurrentStamina"));
+	bool bWep = BlackboardComp->GetValueAsBool(FName("HasWeapon"));
+	bool bMed = BlackboardComp->GetValueAsBool(FName("HasMedkit"));
+	bool bFood = BlackboardComp->GetValueAsBool(FName("HasFood"));
+	
+	UObject* NearestZombie = BlackboardComp->GetValueAsObject(FName("NearestZombie"));
+	bool bHeavyZombie = BlackboardComp->GetValueAsBool(FName("IsHeavyZombie"));
+	UObject* TargetItem = BlackboardComp->GetValueAsObject(FName("NearestItem"));
+	UObject* NearestHouse = BlackboardComp->GetValueAsObject(FName("NearestHouse"));
+	bool bIsInsideHouse = BlackboardComp->GetValueAsBool(FName("IsInsideHouse")); 
+
+	if (NearestZombie)
+	{
+		if (bHeavyZombie) 
+		{
+			AIStateText = TEXT("FLEE PURGE (sprint)");
+		}
+		else if (bWep) 
+		{
+			AIStateText = TEXT("SHOOT");
+		}
+		else 
+		{
+			AIStateText = TEXT("FLEE ZOMBIE (sprint)");
+		}
+	}
+	else if (CurHealth <= 5.0f && bMed)
+	{
+		AIStateText = TEXT("HEAL medkit");
+	}
+	else if (CurStamina <= 5.0f && bFood)
+	{
+		AIStateText = TEXT("EAT food");
+	}
+	else if (TargetItem)
+	{
+		AIStateText = FString::Printf(TEXT("SEEK item: %s"), *TargetItem->GetName());
+	}
+	else if (NearestHouse && !bIsInsideHouse)
+	{
+		AIStateText = TEXT("SEEK house");
+	}
+
+	BlackboardComp->SetValueAsString(FName("AIStateText"), AIStateText);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(42, DeltaSeconds, FColor::Yellow, FString::Printf(TEXT("Mode: %s"), *AIStateText));
+		
+		if (Perceptor)
+		{
+			FString MemoryString = TEXT("Memory Store: [ ");
+			for (ABaseItem* MemItem : Perceptor->KnownItems)
+			{
+				if (IsValid(MemItem))
+				{
+					MemoryString += MemItem->GetName() + TEXT(" ");
+				}
+			}
+			MemoryString += TEXT("]");
+			GEngine->AddOnScreenDebugMessage(43, DeltaSeconds, FColor::Cyan, MemoryString);
 		}
 	}
 }
