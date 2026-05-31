@@ -14,4 +14,10 @@ public:
 
 protected:
 	virtual void TickNode(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
+
+private:
+	float ProximityScanTimer = 0.f;
+
+	FString LastStateText;
+	FColor  LastStateColor = FColor::White;
 };

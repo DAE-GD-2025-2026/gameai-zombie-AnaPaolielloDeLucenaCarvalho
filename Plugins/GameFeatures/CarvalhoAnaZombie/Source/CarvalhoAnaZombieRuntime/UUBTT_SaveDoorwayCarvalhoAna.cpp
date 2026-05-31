@@ -15,13 +15,13 @@ EBTNodeResult::Type UUBTT_SaveDoorwayCarvalhoAna::ExecuteTask(UBehaviorTreeCompo
 	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
 	if (!BBComp || !Pawn) return EBTNodeResult::Failed;
  
-	UStudentPerceptorCarvalhoAna* Perceptor    = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
-	AHouse*            HouseToEnter = Cast<AHouse>(BBComp->GetValueAsObject(FName("NearestHouse")));
+	UStudentPerceptorCarvalhoAna* Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+	AHouse* HouseToEnter = Cast<AHouse>(BBComp->GetValueAsObject(FName("NearestHouse")));
 	if (Perceptor && HouseToEnter)
+	{
 		Perceptor->VisitedHouses.AddUnique(HouseToEnter);
- 
-	BBComp->SetValueAsVector(FName("DoorwayLocation"), Pawn->GetActorLocation());
-	BBComp->SetValueAsBool(FName("IsInsideHouse"), true);
+	}
  
 	return EBTNodeResult::Succeeded;
+
 }

@@ -29,37 +29,45 @@ protected:
 	virtual void TickTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory, float DeltaSeconds) override;
 
 private:
-	// Wander tracking (navigation-based)
+	FVector GetPathSeekForce(APawn* Pawn, const FVector& TargetLoc, float DeltaSeconds);
+
+private:
+	// wander tracking (navigation-based)
 	float WanderAngle = 0.0f;
 	float WanderTimer = 0.0f;
 	FVector LastWanderTarget = FVector::ZeroVector;
 	float WanderTargetReachedDistance = 200.0f;
 	float TimeSinceWanderStart = 0.0f;
+
+	TArray<FVector> CurrentPath;
+	int32 CurrentPathIndex = 0;
+	float PathUpdateTimer  = 999.f;
+	FVector LastSeekTarget = FVector::ZeroVector;
 	
-	// Stuck detection (improved)
+	// stuck detection
 	FVector LastPosition = FVector::ZeroVector;
 	FVector LastReportedPosition = FVector::ZeroVector;
 	float StuckTimer = 0.0f;
 	bool bIsStuck = false;
-	float StuckThreshold = 25.0f;  // Tighter threshold
-	float StuckTimeLimit = 0.8f;   // Faster trigger
-	float StuckCheckInterval = 0.25f; // More frequent checks
+	float StuckThreshold = 25.0f; // distance moved threshold to consider stuck
+	float StuckTimeLimit = 0.8f;
+	float StuckCheckInterval = 0.25f; // frequent checks
 	float LastStuckCheckTime = 0.0f;
 	
-	// Hallway detection
+	// hallway detection
 	int32 HallwayWhiskerCount = 0;
 	float HallwayEscapeTimer = 0.0f;
 	bool bInHallway = false;
 	
-	// House tracking with position verification
+	// house tracking
 	bool bPreviouslyInside = false;
 	FVector SavedDoorwayLocation = FVector::ZeroVector;
 	float HouseExitThreshold = 200.0f;
 	
-	// Seek force smoothing (fixes jitter when target switches)
+	// seek force
 	FVector LastSeekForce = FVector::ZeroVector;
 
-	// Aiming debug
+	// aiming debug
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bDrawAimingDebug = true;
 };
