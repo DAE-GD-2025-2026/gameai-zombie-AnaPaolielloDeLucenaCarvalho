@@ -56,6 +56,9 @@ private:
 	FVector SavedDoorwayLocation = FVector::ZeroVector;
 	float HouseExitThreshold = 200.0f;
 	
+	// Seek force smoothing (fixes jitter when target switches)
+	FVector LastSeekForce = FVector::ZeroVector;
+
 	// Aiming debug
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bDrawAimingDebug = true;

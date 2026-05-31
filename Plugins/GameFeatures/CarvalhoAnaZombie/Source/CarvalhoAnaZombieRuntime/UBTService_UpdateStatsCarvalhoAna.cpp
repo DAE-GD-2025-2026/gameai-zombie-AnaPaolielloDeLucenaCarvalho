@@ -11,6 +11,7 @@
 #include "Common/StaminaComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Zombies/BaseZombie.h"
+#include "Village/House/House.h"
 
 UBTService_UpdateStatsCarvalhoAna::UBTService_UpdateStatsCarvalhoAna()
 {
@@ -32,16 +33,19 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 	if (!SurvivorPawn) return;
 
 	// monitor health
+	float NewHealth = 0.f;
+	float NewStamina = 0.f;
+
 	if (UHealthComponent* HealthComp = SurvivorPawn->FindComponentByClass<UHealthComponent>())
 	{
 		// get old health
 		float OldHealth = BlackboardComp->GetValueAsFloat(FName("CurrentHealth"));
-		float NewHealth = HealthComp->GetHealth(); 
+		NewHealth = HealthComp->GetHealth(); 
         
 		// have we taken damage since the last tick (since DAMAGE SENSE in student perceptor didnt work)
 		if (NewHealth < OldHealth && OldHealth > 0.0f)
 		{
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH!"));
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH!"));
 
 			// search for all zombies
 			TArray<AActor*> FoundZombies;
@@ -84,17 +88,17 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 	// Monitor Stamina
 	if (UStaminaComponent* StaminaComp = SurvivorPawn->FindComponentByClass<UStaminaComponent>())
 	{
-		float CurrentStamina = StaminaComp->GetCurrentStamina();
-		BlackboardComp->SetValueAsFloat(FName("CurrentStamina"), CurrentStamina);
+		NewStamina = StaminaComp->GetCurrentStamina();
+		BlackboardComp->SetValueAsFloat(FName("CurrentStamina"), NewStamina);
 	}
 
 	// monitor inventory
+	bool bHasWeapon = false;
+	bool bHasMedkit = false;
+	bool bHasFood   = false;
+
 	if (UInventoryComponent* InventoryComp = SurvivorPawn->FindComponentByClass<UInventoryComponent>())
 	{
-		bool bHasWeapon = false;
-		bool bHasMedkit = false;
-		bool bHasFood = false;
-
 		TArray<ABaseItem*> Backpack = InventoryComp->GetInventory();
 		
 		for (ABaseItem* Item : Backpack)
@@ -111,125 +115,175 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 	
 	// memory retrival
 	UStudentPerceptorCarvalhoAna* Perceptor = SurvivorPawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
-	UObject* CurrentTargetItem = BlackboardComp->GetValueAsObject(FName("NearestItem"));
-        
-	// search memory if not walking towards an item
-	if (Perceptor && !CurrentTargetItem)
+	UObject* CurrentTargetItem  = BlackboardComp->GetValueAsObject(FName("NearestItem"));
+	UObject* CurrentTargetHouse = BlackboardComp->GetValueAsObject(FName("NearestHouse"));
+
+	if (Perceptor)
 	{
 		// clean memory
 		Perceptor->KnownItems.RemoveAll([](ABaseItem* MemItem) { return !IsValid(MemItem); });
 
-		float MyHealth = BlackboardComp->GetValueAsFloat(FName("CurrentHealth"));
-		float MyStamina = BlackboardComp->GetValueAsFloat(FName("CurrentStamina"));
-		bool bHaveWeapon = BlackboardComp->GetValueAsBool(FName("HasWeapon"));
-		bool bHaveMedkit = BlackboardComp->GetValueAsBool(FName("HasMedkit"));
-		bool bHaveFood = BlackboardComp->GetValueAsBool(FName("HasFood"));
-
-		ABaseItem* BestMemoryItem = nullptr;
-		float ClosestDist = 999999.0f;
-
-		// what do we need? find the most urgent thing in memory (health, stamina, weapon)
-		for (ABaseItem* MemItem : Perceptor->KnownItems)
+		if (!CurrentTargetItem)
 		{
-			if (!IsValid(MemItem)) continue;
-                
-			bool bNeedThis = false;
-                
-			if (Cast<AMedkit>(MemItem) && MyHealth <= 5.0f && !bHaveMedkit) bNeedThis = true;
-			if (Cast<AFood>(MemItem) && MyStamina <= 5.0f && !bHaveFood) bNeedThis = true;
-			if (Cast<AWeapon>(MemItem) && !bHaveWeapon) bNeedThis = true;
+			ABaseItem* BestMemoryItem = nullptr;
+			float ClosestDist = 999999.0f;
 
-			if (bNeedThis)
+			for (ABaseItem* MemItem : Perceptor->KnownItems)
 			{
-				float Dist = FVector::Dist(SurvivorPawn->GetActorLocation(), MemItem->GetActorLocation());
-				if (Dist < ClosestDist)
+				if (!IsValid(MemItem)) continue;
+                
+				bool bNeedThis = false;
+                
+				if (Cast<AMedkit>(MemItem) && NewHealth  <= 5.0f && !bHasMedkit) bNeedThis = true;
+				if (Cast<AFood>(MemItem)   && NewStamina <= 5.0f && !bHasFood)   bNeedThis = true;
+				if (Cast<AWeapon>(MemItem) && !bHasWeapon)                       bNeedThis = true;
+
+				if (bNeedThis)
 				{
-					ClosestDist = Dist;
-					BestMemoryItem = MemItem;
+					float Dist = FVector::Dist(SurvivorPawn->GetActorLocation(), MemItem->GetActorLocation());
+					if (Dist < ClosestDist)
+					{
+						ClosestDist = Dist;
+						BestMemoryItem = MemItem;
+					}
 				}
+			}
+
+			if (BestMemoryItem)
+			{
+				BlackboardComp->SetValueAsObject(FName("NearestItem"), BestMemoryItem);
+				GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor::Cyan,
+					FString::Printf(TEXT("[MEMORY ->] I need a %s! Going back to get it!"), *BestMemoryItem->GetName()));
+
+				Perceptor->KnownItems.Remove(BestMemoryItem);
 			}
 		}
 
-		// we found something in memory that we need = new target
-		if (BestMemoryItem)
+		if (!CurrentTargetHouse)
 		{
-			BlackboardComp->SetValueAsObject(FName("NearestItem"), BestMemoryItem);
-            
-			if (GEngine)
+			FVector BestHouseLoc = FVector::ZeroVector;
+			float ClosestDist = 999999.0f;
+			bool bFoundHouse = false;
+
+			for (FVector HouseLoc : Perceptor->KnownHouses)
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor::Cyan, FString::Printf(TEXT("[MEMORY] Retrieved target: %s"), *BestMemoryItem->GetName()));
+				// skip if this is already a visited house (check by proximity)
+				bool bAlreadyVisited = Perceptor->VisitedHouses.ContainsByPredicate([&](AHouse* VH)
+				{
+					return IsValid(VH) && FVector::Dist2D(VH->GetActorLocation(), HouseLoc) < 200.f;
+				});
+				if (bAlreadyVisited) continue;
+
+				float Dist = FVector::Dist(SurvivorPawn->GetActorLocation(), HouseLoc);
+				if (Dist < ClosestDist)
+				{
+					ClosestDist = Dist;
+					BestHouseLoc = HouseLoc;
+					bFoundHouse = true;
+				}
 			}
-			
-			Perceptor->KnownItems.Remove(BestMemoryItem);
+
+			if (bFoundHouse)
+			{
+				// We can only set a vector key, not find the AHouse* from just a location.
+				// Set a dedicated memory key so the BT/BlendedSteer can use it.
+				BlackboardComp->SetValueAsVector(FName("MemoryHouseLocation"), BestHouseLoc);
+				GEngine->AddOnScreenDebugMessage(-1, 6.f, FColor::Cyan,
+					FString::Printf(TEXT("[MEMORY ->] Going back to known house at (%.0f, %.0f)"),
+						BestHouseLoc.X, BestHouseLoc.Y));
+			}
+			else
+			{
+				// No unvisited house in memory - clear the key
+				BlackboardComp->SetValueAsVector(FName("MemoryHouseLocation"), FAISystem::InvalidLocation);
+			}
 		}
 	}
 
 	// Damians idea - see what state is happening
 
-	FString AIStateText = TEXT("WANDER");
+	// Determine current AI state for display
+	bool bHasZombie    = (BlackboardComp->GetValueAsObject(FName("NearestZombie")) != nullptr);
+	bool bHasItem      = (BlackboardComp->GetValueAsObject(FName("NearestItem"))   != nullptr);
+	bool bHasHouse     = (BlackboardComp->GetValueAsObject(FName("NearestHouse"))  != nullptr);
+	bool bIsInPurge    = BlackboardComp->GetValueAsBool(FName("IsInPurgeZone"));
+	bool bIsInHouse    = BlackboardComp->GetValueAsBool(FName("IsInsideHouse"));
+	bool bIsHeavy      = BlackboardComp->GetValueAsBool(FName("IsHeavyZombie"));
+	bool bIsRunner     = BlackboardComp->GetValueAsBool(FName("IsRunnerZombie"));
 
-	float CurHealth = BlackboardComp->GetValueAsFloat(FName("CurrentHealth"));
-	float CurStamina = BlackboardComp->GetValueAsFloat(FName("CurrentStamina"));
-	bool bWep = BlackboardComp->GetValueAsBool(FName("HasWeapon"));
-	bool bMed = BlackboardComp->GetValueAsBool(FName("HasMedkit"));
-	bool bFood = BlackboardComp->GetValueAsBool(FName("HasFood"));
-	
-	UObject* NearestZombie = BlackboardComp->GetValueAsObject(FName("NearestZombie"));
-	bool bHeavyZombie = BlackboardComp->GetValueAsBool(FName("IsHeavyZombie"));
-	UObject* TargetItem = BlackboardComp->GetValueAsObject(FName("NearestItem"));
-	UObject* NearestHouse = BlackboardComp->GetValueAsObject(FName("NearestHouse"));
-	bool bIsInsideHouse = BlackboardComp->GetValueAsBool(FName("IsInsideHouse")); 
+	FColor StateColor = FColor::White;
+	FString StateText;
 
-	if (NearestZombie)
+	if (bIsInPurge)
 	{
-		if (bHeavyZombie) 
-		{
-			AIStateText = TEXT("FLEE PURGE (sprint)");
-		}
-		else if (bWep) 
-		{
-			AIStateText = TEXT("SHOOT");
-		}
-		else 
-		{
-			AIStateText = TEXT("FLEE ZOMBIE (sprint)");
-		}
+		StateText  = TEXT(">> FLEE PURGE ZONE [SPRINT] <<");
+		StateColor = FColor::Orange;
 	}
-	else if (CurHealth <= 5.0f && bMed)
+	else if (bHasZombie && bHasWeapon && !bIsHeavy)
 	{
-		AIStateText = TEXT("HEAL medkit");
+		StateText  = TEXT(">> COMBAT - Shooting! <<");
+		StateColor = FColor::Red;
 	}
-	else if (CurStamina <= 5.0f && bFood)
+	else if (bHasZombie && bIsHeavy)
 	{
-		AIStateText = TEXT("EAT food");
+		StateText  = TEXT(">> FLEE - Heavy Zombie! <<");
+		StateColor = FColor(255, 100, 0); // orange-red
 	}
-	else if (TargetItem)
+	else if (bHasZombie)
 	{
-		AIStateText = FString::Printf(TEXT("SEEK item: %s"), *TargetItem->GetName());
+		StateText  = bIsRunner
+			? TEXT(">> FLEE - Runner Zombie! [SPRINT] <<")
+			: TEXT(">> FLEE - Zombie nearby <<");
+		StateColor = FColor(255, 80, 80);
 	}
-	else if (NearestHouse && !bIsInsideHouse)
+	else if (NewHealth <= 5.f && bHasMedkit)
 	{
-		AIStateText = TEXT("SEEK house");
+		StateText  = TEXT(">> HEAL - Using Medkit <<");
+		StateColor = FColor::Green;
+	}
+	else if (NewStamina <= 5.f && bHasFood)
+	{
+		StateText  = TEXT(">> EAT - Using Food <<");
+		StateColor = FColor::Yellow;
+	}
+	else if (bHasItem)
+	{
+		AActor* TargetItem = Cast<AActor>(BlackboardComp->GetValueAsObject(FName("NearestItem")));
+		FString ItemName = TargetItem ? TargetItem->GetName() : TEXT("???");
+		StateText  = FString::Printf(TEXT(">> SEEK ITEM: %s <<"), *ItemName);
+		StateColor = FColor::Cyan;
+	}
+	else if (bIsInHouse)
+	{
+		StateText  = TEXT(">> EXIT HOUSE <<");
+		StateColor = FColor::Silver;
+	}
+	else if (bHasHouse)
+	{
+		StateText  = TEXT(">> SCOUT HOUSE <<");
+		StateColor = FColor(100, 200, 255);
+	}
+	else
+	{
+		StateText  = TEXT(">> WANDER <<");
+		StateColor = FColor::White;
 	}
 
-	BlackboardComp->SetValueAsString(FName("AIStateText"), AIStateText);
+	GEngine->AddOnScreenDebugMessage(50, 0.0f, StateColor,
+		FString::Printf(TEXT("AI STATE: %s"), *StateText));
 
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(42, DeltaSeconds, FColor::Yellow, FString::Printf(TEXT("Mode: %s"), *AIStateText));
-		
-		if (Perceptor)
-		{
-			FString MemoryString = TEXT("Memory Store: [ ");
-			for (ABaseItem* MemItem : Perceptor->KnownItems)
-			{
-				if (IsValid(MemItem))
-				{
-					MemoryString += MemItem->GetName() + TEXT(" ");
-				}
-			}
-			MemoryString += TEXT("]");
-			GEngine->AddOnScreenDebugMessage(43, DeltaSeconds, FColor::Cyan, MemoryString);
-		}
-	}
+	GEngine->AddOnScreenDebugMessage(51, 0.0f, FColor::White,
+		FString::Printf(TEXT("HP: %.0f  |  Stamina: %.1f  |  Weapon:%s  Medkit:%s  Food:%s"),
+			NewHealth, NewStamina,
+			bHasWeapon ? TEXT("YES") : TEXT("no"),
+			bHasMedkit ? TEXT("YES") : TEXT("no"),
+			bHasFood   ? TEXT("YES") : TEXT("no")));
+
+	GEngine->AddOnScreenDebugMessage(52, 0.0f, FColor::Silver,
+		FString::Printf(TEXT("Zombie:%s  House:%s  Item:%s  InPurge:%s  InHouse:%s"),
+			bHasZombie  ? TEXT("YES") : TEXT("no"),
+			bHasHouse   ? TEXT("YES") : TEXT("no"),
+			bHasItem    ? TEXT("YES") : TEXT("no"),
+			bIsInPurge  ? TEXT("YES") : TEXT("no"),
+			bIsInHouse  ? TEXT("YES") : TEXT("no")));
 }

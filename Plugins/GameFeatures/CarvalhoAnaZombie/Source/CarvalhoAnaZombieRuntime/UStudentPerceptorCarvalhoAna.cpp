@@ -34,7 +34,6 @@ void UStudentPerceptorCarvalhoAna::BeginPlay()
 void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	//GEngine->AddOnScreenDebugMessage(5, 1.f, FColor::Green, FString::Printf(TEXT("Saw Something!")));
-	
 	if (!Actor || !Stimulus.WasSuccessfullySensed())
 	{
 		return;
@@ -80,7 +79,7 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 				BlackboardComp->SetValueAsBool(FName("IsHeavyZombie"), false);
 			}
 
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH! BEHIND USE!"));
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Red, TEXT("OUCH! BEHIND ME!"));
 			
 			return; 
 		}
@@ -124,13 +123,25 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 	else if (AHouse* SeenHouse = Cast<AHouse>(Actor)) // -> is a House? (Seeking logic)
 	{
 		// THE MAP - remember where this house is for emergencies (hiding)
-		KnownHouses.AddUnique(SeenHouse->GetActorLocation()); 
+		bool bAlreadyKnown = KnownHouses.ContainsByPredicate([&](FVector Loc){
+			return FVector::Dist2D(Loc, SeenHouse->GetActorLocation()) < 200.f;
+		});
+		
+		if (!bAlreadyKnown)
+		{
+			KnownHouses.AddUnique(SeenHouse->GetActorLocation()); 
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue,
+				FString::Printf(TEXT("[MEMORY +] Saved house location at (%.0f, %.0f)"),
+					SeenHouse->GetActorLocation().X, SeenHouse->GetActorLocation().Y));
+		}
 
 		// LOOT - did we already looted this house?
 		if (!VisitedHouses.Contains(SeenHouse))
 		{
 			// new house, loot it
 			BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan,
+				FString::Printf(TEXT("[SIGHT] New house spotted! Going to loot it.")));
 		}
 		else
 		{
@@ -145,6 +156,8 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 		if (EmptySlots > 0 && !bHasWeapon)
 		{
 			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenWeapon);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green,
+				FString::Printf(TEXT("[SIGHT] Weapon spotted! Going to pick up: %s"), *SeenWeapon->GetName()));
 		}
 		else
 		{
@@ -152,7 +165,11 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!KnownItems.Contains(SeenWeapon))
 			{
 				KnownItems.AddUnique(SeenWeapon);
-				GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Purple, FString::Printf(TEXT("MEMORY SAVED: Don't need %s right now. Saving location!"), *SeenWeapon->GetName()));
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Purple,
+					FString::Printf(TEXT("[MEMORY +] Saved weapon for later: %s at (%.0f, %.0f)"),
+						*SeenWeapon->GetName(),
+						SeenWeapon->GetActorLocation().X,
+						SeenWeapon->GetActorLocation().Y));
 			}
 		}
 	}
@@ -165,10 +182,12 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 		}
 		
 		// do we have space for Food/Medkits?
-		if (EmptySlots > 0)
+		else if (EmptySlots > 0)
 		{
 			// have space, grab it
 			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
+			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green,
+				FString::Printf(TEXT("[SIGHT] Item spotted! Going to pick up: %s"), *SeenItem->GetName()));
 		}
 		else
 		{
@@ -176,7 +195,11 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!KnownItems.Contains(SeenItem))
 			{
 				KnownItems.AddUnique(SeenItem);
-				GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Purple, FString::Printf(TEXT("MEMORY SAVED: Don't need %s right now. Saving location!"), *SeenWeapon->GetName()));
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Purple,
+					FString::Printf(TEXT("[MEMORY +] Saved item for later: %s at (%.0f, %.0f)"),
+						*SeenItem->GetName(),
+						SeenItem->GetActorLocation().X,
+						SeenItem->GetActorLocation().Y));
 			}
 		}
 	}

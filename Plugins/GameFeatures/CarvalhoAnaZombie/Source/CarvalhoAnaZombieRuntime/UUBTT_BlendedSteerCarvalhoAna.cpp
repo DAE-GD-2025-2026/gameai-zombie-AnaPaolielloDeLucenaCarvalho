@@ -26,6 +26,10 @@ EBTNodeResult::Type UUBTT_BlendedSteerCarvalhoAna::ExecuteTask(UBehaviorTreeComp
 		LastPosition = AIController->GetPawn()->GetActorLocation();
 		bIsStuck = false;
 		StuckTimer = 0.0f;
+
+		// Force an immediate new wander target on first run
+		LastWanderTarget = FVector::ZeroVector;
+		TimeSinceWanderStart = 9999.f;
 	}
 	
 	return EBTNodeResult::InProgress;
@@ -62,6 +66,10 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		SeekForce = ToItem;
 		SeekForce.Z = 0.0f;
 		SeekForce.Normalize();
+
+		// smooth seek transitions to prevent jitter when target position changes
+		SeekForce = FMath::VInterpTo(LastSeekForce, SeekForce, DeltaSeconds, 6.0f);
+		LastSeekForce = SeekForce;
 	}
 	
 // SEEK HOUSE
@@ -148,27 +156,54 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 // WANDER
 	FVector WanderForce = FVector::ZeroVector;
 	
-	//  reached current wander target
 	float DistToWanderTarget = FVector::Dist(Pawn->GetActorLocation(), LastWanderTarget);
-	if (DistToWanderTarget < WanderTargetReachedDistance || TimeSinceWanderStart > 10.0f)
+
+	bool bNeedNewTarget = (DistToWanderTarget < WanderTargetReachedDistance) 
+	                   || (TimeSinceWanderStart > 12.0f)
+	                   || (LastWanderTarget.IsNearlyZero());
+
+	if (bNeedNewTarget)
 	{
-		// get new location on navmesh
 		if (UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World))
 		{
 			FVector CurrentLoc = Pawn->GetActorLocation();
-			FVector RandomOffset = FVector(
-				FMath::RandRange(-2000.0f, 2000.0f),
-				FMath::RandRange(-2000.0f, 2000.0f),
-				0.0f
-			);
-			FVector CandidateLocation = CurrentLoc + RandomOffset;
-			
+
+			float SearchRadius = FMath::RandRange(2500.0f, 5000.0f);
+
+			float AngleSpread = FMath::RandRange(-PI / 3.f, PI / 3.f);
+			float PreferredAngle = WanderAngle + AngleSpread;
+
+			FVector PreferredDir = FVector(FMath::Cos(PreferredAngle), FMath::Sin(PreferredAngle), 0.f);
+			FVector CandidateLocation = CurrentLoc + PreferredDir * SearchRadius;
+
 			FNavLocation ProjectedLocation;
-			if (NavSys->ProjectPointToNavigation(CandidateLocation, ProjectedLocation))
+			bool bFound = NavSys->ProjectPointToNavigation(CandidateLocation, ProjectedLocation, FVector(500.f, 500.f, 200.f));
+
+			if (!bFound)
+			{
+				FVector RandomOffset = FVector(
+					FMath::RandRange(-3000.0f, 3000.0f),
+					FMath::RandRange(-3000.0f, 3000.0f),
+					0.0f
+				);
+				bFound = NavSys->ProjectPointToNavigation(CurrentLoc + RandomOffset, ProjectedLocation, FVector(500.f, 500.f, 200.f));
+			}
+
+			if (bFound)
 			{
 				LastWanderTarget = ProjectedLocation.Location;
 				TimeSinceWanderStart = 0.0f;
-				WanderAngle = FMath::RandRange(-PI, PI);
+
+				FVector NewDir = (LastWanderTarget - CurrentLoc).GetSafeNormal2D();
+				if (!NewDir.IsNearlyZero())
+				{
+					WanderAngle = FMath::Atan2(NewDir.Y, NewDir.X);
+				}
+
+				if (bDrawAimingDebug)
+				{
+					DrawDebugSphere(World, LastWanderTarget, 40.0f, 8, FColor::Yellow, false, 3.0f);
+				}
 			}
 		}
 	}
@@ -182,22 +217,15 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 	if (!ToWanderTarget.IsNearlyZero())
 	{
 		ToWanderTarget.Normalize();
-		
-		WanderAngle += FMath::RandRange(-WanderJitter * 0.3f, WanderJitter * 0.3f) * DeltaSeconds;
-		
-		FVector AngleVariation = FVector(FMath::Cos(WanderAngle), FMath::Sin(WanderAngle), 0.0f);
-		WanderForce = (ToWanderTarget * 0.85f + AngleVariation * 0.15f);
-		WanderForce.Normalize();
+		WanderForce = ToWanderTarget;
 	}
 	else
 	{
-		// Fallback - small circle if target not set
-		WanderAngle += FMath::RandRange(-WanderJitter * 0.2f, WanderJitter * 0.2f) * DeltaSeconds;
 		WanderForce = FVector(FMath::Cos(WanderAngle), FMath::Sin(WanderAngle), 0.0f);
 	}
 
 // FLEE  (Lab: SteeringBehaviors.cpp)
-	FVector FleeForce    = FVector::ZeroVector;
+	FVector FleeForce = FVector::ZeroVector;
 
 	if (NearestZombie)
 	{
@@ -251,27 +279,55 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 			{
 				bIsStuck = true;
 				
-				// in hallway = forward + rotate heavily
-				if (bInHallway)
+				float BestClearDist = -1.f;
+				float BestAngle     = WanderAngle + PI; // fallback: reverse
+
+				FVector RayStart = Pawn->GetActorLocation();
+				FCollisionQueryParams RayParams;
+				RayParams.AddIgnoredActor(Pawn);
+
+				const int32 NumRays = 8;
+				const float RayLength = 400.f;
+
+				for (int32 r = 0; r < NumRays; ++r)
 				{
-					float EscapeRotation = FMath::RandRange(PI * 0.3f, PI * 1.2f);
-					WanderAngle += EscapeRotation;
+					float TestAngle = (r / (float)NumRays) * 2.f * PI;
+					FVector RayDir  = FVector(FMath::Cos(TestAngle), FMath::Sin(TestAngle), 0.f);
+					FVector RayEnd  = RayStart + RayDir * RayLength;
+
+					FHitResult RayHit;
+					float ClearDist = RayLength;
+
+					if (World->LineTraceSingleByChannel(RayHit, RayStart, RayEnd, ECC_WorldStatic, RayParams))
+					{
+						ClearDist = RayHit.Distance;
+					}
+
+					if (bDrawAimingDebug)
+					{
+						FColor RayColor = (ClearDist > RayLength * 0.6f) ? FColor::Cyan : FColor::Red;
+						DrawDebugLine(World, RayStart, RayEnd, RayColor, false, 0.5f, 0, 1.f);
+					}
+
+					if (ClearDist > BestClearDist)
+					{
+						BestClearDist = ClearDist;
+						BestAngle     = TestAngle;
+					}
 				}
-				else
-				{
-					// open = rotate 90-180 degrees
-					float EscapeRotation = FMath::RandRange(PI * 0.5f, PI);
-					WanderAngle += EscapeRotation + FMath::RandRange(-0.3f, 0.3f);
-				}
+
+				WanderAngle = BestAngle;
+
+				TimeSinceWanderStart = 999.f;
 				
 				StuckTimer = 0.0f;
 				
 				// Debug - Show escape attempt
 				if (bDrawAimingDebug)
 				{
-					FVector DebugPos = Pawn->GetActorLocation() + FVector(0, 0, 100);
 					FColor DebugColor = bInHallway ? FColor::Magenta : FColor::Purple;
-					DrawDebugSphere(World, DebugPos, 50.0f, 16, DebugColor, false, 0.5f);
+					DrawDebugSphere(World, Pawn->GetActorLocation() + FVector(0, 0, 100), 60.0f, 16, DebugColor, false, 0.5f);
+					DrawDebugString(World, Pawn->GetActorLocation() + FVector(0, 0, 150), TEXT("STUCK - Escaping!"), nullptr, DebugColor, 0.5f);
 				}
 			}
 		}
@@ -334,13 +390,17 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 			AvoidanceForce += Hit.ImpactNormal * Proximity * 5.0f;
 
 			if (W.Angle == 0.0f)
+			if (W.Angle == 0.0f) // centre whisker hit - add lateral push
 			{
 				AvoidanceForce += Pawn->GetActorRightVector() * Proximity * 4.0f;
 			}
 
-			DrawDebugLine(World, Start, Hit.ImpactPoint, FColor::Red, false, -1.0f, 0, 2.0f);
+			if (bDrawAimingDebug)
+			{
+				DrawDebugLine(World, Start, Hit.ImpactPoint, FColor::Red, false, -1.0f, 0, 2.0f);
+			}
 		}
-		else
+		else if (bDrawAimingDebug)
 		{
 			DrawDebugLine(World, Start, End, FColor::Green, false, -1.0f, 0, 1.0f);
 		}
@@ -352,6 +412,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		bIsHallway = true;
 		HallwayEscapeTimer += DeltaSeconds;
 		
+		// Drive forward through the hallway instead of fighting the walls
 		AvoidanceForce = Forward * 3.0f;
 		
 		if (bDrawAimingDebug)
@@ -372,6 +433,10 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		WanderAngle += PI;		
 		//WanderAngle += FMath::RandRange(-PI * 0.9f, PI * 0.9f);
 		bIsStuck = true;
+
+		// Force immediate new target
+		LastWanderTarget     = FVector::ZeroVector;
+		TimeSinceWanderStart = 999.f;
 		
 		if (bDrawAimingDebug)
 		{
@@ -382,19 +447,11 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 	{
 		AvoidanceForce *= 2.0f;
 		AvoidanceForce += Pawn->GetActorRightVector() * 3.0f; 
-		WanderAngle += FMath::RandRange(PI * 0.4f, PI * 0.8f);
-		//WanderAngle += FMath::RandRange(-PI * 0.4f, PI * 0.4f);
+		WanderAngle    += FMath::RandRange(PI * 0.4f, PI * 0.8f);
 	}
 
 // HOUSE CONTAINMENT
-	bool bAvoidWalls = true;
-	
 	if (bIsInside && !NearestItem)
-	{
-		bAvoidWalls = false;
-	}
-
-	if (bIsInside && bAvoidWalls)
 	{
 		AHouse* CurrentHouse = Cast<AHouse>(BBComp->GetValueAsObject("NearestHouse"));
 		if (CurrentHouse)
@@ -435,7 +492,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 	}
 
 	DesiredDirection.Z = 0.0f;
-	DesiredDirection.Normalize();
+	if (!DesiredDirection.IsNearlyZero()) DesiredDirection.Normalize();
 
 	if (!AvoidanceForce.IsNearlyZero())
 	{
@@ -447,7 +504,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 	}
 
 	FinalSteeringForce.Z = 0.0f;
-	FinalSteeringForce.Normalize();
+	if (!FinalSteeringForce.IsNearlyZero()) FinalSteeringForce.Normalize();
 
 // SPRINTING  (only when fleeing + stamina available)
 	if (ASurvivorPawn* Survivor = Cast<ASurvivorPawn>(Pawn))
@@ -485,29 +542,30 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 // DEBUG VISUALIZATION
 	if (bDrawAimingDebug)
 	{
-		// Draw aiming direction (forward vector)
 		FVector AimStart = Pawn->GetActorLocation() + FVector(0, 0, 80);
-		FVector AimEnd = AimStart + (Pawn->GetActorForwardVector() * 200.0f);
+		FVector AimEnd   = AimStart + (Pawn->GetActorForwardVector() * 200.0f);
 		DrawDebugLine(World, AimStart, AimEnd, FColor::Cyan, false, -1.0f, 0, 3.0f);
 		
-		// Draw steering force direction (in yellow)
 		if (!FinalSteeringForce.IsNearlyZero())
 		{
 			FVector SteerEnd = AimStart + (FinalSteeringForce * 200.0f);
 			DrawDebugLine(World, AimStart, SteerEnd, FColor::Yellow, false, -1.0f, 0, 2.0f);
 		}
 		
-		// Draw "stuck" indicator (purple sphere)
 		if (bIsStuck)
 		{
 			DrawDebugSphere(World, AimStart, 50.0f, 12, FColor::Purple, false, -1.0f);
 		}
 		
-		// Draw nearest threat (zombie) in red
 		if (NearestZombie)
 		{
 			FVector ThreatPos = NearestZombie->GetActorLocation();
 			DrawDebugLine(World, AimStart, ThreatPos, FColor::Red, false, -1.0f, 0, 1.5f);
+		}
+
+		if (!LastWanderTarget.IsZero())
+		{
+			DrawDebugLine(World, Pawn->GetActorLocation(), LastWanderTarget, FColor::White, false, -1.0f, 0, 1.0f);
 		}
 	}
 }
