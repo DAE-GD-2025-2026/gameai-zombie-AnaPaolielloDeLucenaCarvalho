@@ -121,7 +121,8 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 		BBComp->SetValueAsBool(FName("HasFood"), bHasFood);
 	}
 	
-	UStudentPerceptorCarvalhoAna* Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+	UStudentPerceptorCarvalhoAna* Perceptor = AICon->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+	if (!Perceptor) Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
 
 	// still in FLEE but zombie is far = forget zombie
 	if (AActor* CurZombie = Cast<AActor>(BBComp->GetValueAsObject(FName("NearestZombie"))))

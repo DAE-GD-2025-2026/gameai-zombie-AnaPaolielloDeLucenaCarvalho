@@ -148,12 +148,12 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 
 			if (DistToHouse < 80.0f)
 			{
-				// blacklist house, project exit point OUTSIDE entry, commit inside state
-				UStudentPerceptorCarvalhoAna* Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
-				if (Perceptor) Perceptor->VisitedHouses.AddUnique(Cast<AHouse>(NearestHouse));
+				UStudentPerceptorCarvalhoAna* Perceptor = AIController->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+				if (!Perceptor) Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+				AHouse* HousePtr = Cast<AHouse>(BBComp->GetValueAsObject(FName("NearestHouse")));
+				if (Perceptor && HousePtr) Perceptor->VisitedHouses.AddUnique(HousePtr);
 				FVector OutsideDir = (Pawn->GetActorLocation() - HouseLoc).GetSafeNormal2D();
-				BBComp->SetValueAsVector(FName("DoorwayLocation"), Pawn->GetActorLocation() + OutsideDir * 250.f);
-				BBComp->ClearValue(FName("NearestHouse"));
+				BBComp->SetValueAsVector(FName("DoorwayLocation"), Pawn->GetActorLocation() + OutsideDir * 300.f);
 				BBComp->SetValueAsBool(FName("IsInsideHouse"), true);
 				FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 				return;
@@ -181,7 +181,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		float DistToDoor = FVector::Dist2D(Pawn->GetActorLocation(), DoorwayLoc);
 
 		// close to the doorway = out
-		if (DistToDoor < 150.f)
+		if (DistToDoor < 60.f)
 		{
 			BBComp->SetValueAsBool(FName("IsInsideHouse"), false);
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);

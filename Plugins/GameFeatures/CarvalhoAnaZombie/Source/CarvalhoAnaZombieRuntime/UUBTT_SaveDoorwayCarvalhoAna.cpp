@@ -12,10 +12,12 @@ UUBTT_SaveDoorwayCarvalhoAna::UUBTT_SaveDoorwayCarvalhoAna()
 EBTNodeResult::Type UUBTT_SaveDoorwayCarvalhoAna::ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory)
 {
 	UBlackboardComponent* BBComp = OwnerComp.GetBlackboardComponent();
-	APawn* Pawn = OwnerComp.GetAIOwner()->GetPawn();
-	if (!BBComp || !Pawn) return EBTNodeResult::Failed;
+	AAIController* AIController = OwnerComp.GetAIOwner();
+	APawn* Pawn = AIController ? AIController->GetPawn() : nullptr;
+	if (!BBComp || !AIController) return EBTNodeResult::Failed;
  
-	UStudentPerceptorCarvalhoAna* Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+	UStudentPerceptorCarvalhoAna* Perceptor = AIController->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+	if (!Perceptor && Pawn) Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
 	AHouse* HouseToEnter = Cast<AHouse>(BBComp->GetValueAsObject(FName("NearestHouse")));
 	if (Perceptor && HouseToEnter)
 	{
