@@ -213,7 +213,9 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 	{
 		ProximityScanTimer = 0.f;
 
-		if (!CurrentHouse)
+		// skip house scan while exiting - avoids re-setting NearestHouse and aborting EXIT HOUSE
+		bool bCurrentlyInside = BBComp->GetValueAsBool(FName("IsInsideHouse"));
+		if (!CurrentHouse && !bCurrentlyInside)
 		{
 			TArray<AActor*> AllHouses;
 			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AHouse::StaticClass(), AllHouses);

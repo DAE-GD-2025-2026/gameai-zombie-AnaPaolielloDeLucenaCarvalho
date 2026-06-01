@@ -20,6 +20,8 @@ EBTNodeResult::Type UUBTT_SaveDoorwayCarvalhoAna::ExecuteTask(UBehaviorTreeCompo
 	if (Perceptor && HouseToEnter)
 	{
 		Perceptor->VisitedHouses.AddUnique(HouseToEnter);
+		// clear the key so SCOUT HOUSE decorator stops aborting lower-priority branches
+		BBComp->ClearValue(FName("NearestHouse"));
 	}
  
 	return EBTNodeResult::Succeeded;

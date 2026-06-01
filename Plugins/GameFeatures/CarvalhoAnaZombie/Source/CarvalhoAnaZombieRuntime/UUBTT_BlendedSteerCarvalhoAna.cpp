@@ -148,7 +148,12 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 
 			if (DistToHouse < 80.0f)
 			{
-				BBComp->SetValueAsVector(FName("DoorwayLocation"), Pawn->GetActorLocation());
+				// blacklist house, project exit point OUTSIDE entry, commit inside state
+				UStudentPerceptorCarvalhoAna* Perceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+				if (Perceptor) Perceptor->VisitedHouses.AddUnique(Cast<AHouse>(NearestHouse));
+				FVector OutsideDir = (Pawn->GetActorLocation() - HouseLoc).GetSafeNormal2D();
+				BBComp->SetValueAsVector(FName("DoorwayLocation"), Pawn->GetActorLocation() + OutsideDir * 250.f);
+				BBComp->ClearValue(FName("NearestHouse"));
 				BBComp->SetValueAsBool(FName("IsInsideHouse"), true);
 				FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
 				return;
@@ -374,10 +379,11 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		AvoidanceForce += Pawn->GetActorRightVector() * 2.f;
 	}
 
-// HOUSE CONTAINMENT
-	if (bIsInside && !NearestItem)
+// HOUSE CONTAINMENT (looting only - skip if fleeing or exiting)
+	AActor* NearestHouseForContainment = Cast<AActor>(BBComp->GetValueAsObject("NearestHouse"));
+	if (bIsInside && !NearestItem && FleeForce.IsNearlyZero() && NearestHouseForContainment)
 	{
-		if (AHouse* CH = Cast<AHouse>(BBComp->GetValueAsObject("NearestHouse")))
+		if (AHouse* CH = Cast<AHouse>(NearestHouseForContainment))
 		{
 			FHouseBounds B = CH->GetBounds();
 			FVector PL = Pawn->GetActorLocation();
@@ -394,7 +400,16 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 
 	if (!FleeForce.IsNearlyZero())
 	{
-		DesiredDirection = (FleeForce * 0.85f) + (WanderForce * 0.15f);
+		// inside + fleeing: pull toward doorway so the AI exits instead of being pushed deeper in
+		if (bIsInside && !DoorwayLoc.IsNearlyZero())
+		{
+			FVector ToDoor = (DoorwayLoc - Pawn->GetActorLocation()).GetSafeNormal2D();
+			DesiredDirection = (FleeForce * 0.5f) + (ToDoor * 0.5f);
+		}
+		else
+		{
+			DesiredDirection = (FleeForce * 0.85f) + (WanderForce * 0.15f);
+		}
 	}
 	else if (!SeekForce.IsNearlyZero() && !bIsStuck)
 	{

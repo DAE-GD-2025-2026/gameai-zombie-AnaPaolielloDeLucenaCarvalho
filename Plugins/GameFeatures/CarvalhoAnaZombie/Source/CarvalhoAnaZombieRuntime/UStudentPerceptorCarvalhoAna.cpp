@@ -135,6 +135,9 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 					SeenHouse->GetActorLocation().X, SeenHouse->GetActorLocation().Y));
 		}
 
+		// do not set NearestHouse while inside
+		if (BlackboardComp->GetValueAsBool(FName("IsInsideHouse"))) return;
+
 		// LOOT - did we already looted this house?
 		if (!VisitedHouses.Contains(SeenHouse))
 		{
@@ -145,7 +148,7 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 		}
 		else
 		{
-			// already looted -	 not seting NearestHouse
+			// already looted -	not seting NearestHouse
 		}
 	}
 	else if (AWeapon* SeenWeapon = Cast<AWeapon>(Actor)) // -> is a Weapon? (Seeking logic)
