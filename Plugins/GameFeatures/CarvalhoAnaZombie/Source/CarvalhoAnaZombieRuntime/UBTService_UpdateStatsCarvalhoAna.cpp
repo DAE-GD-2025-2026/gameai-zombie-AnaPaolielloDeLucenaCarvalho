@@ -13,10 +13,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "Zombies/BaseZombie.h"
 #include "Village/House/House.h"
+#include "PurgeZones/PurgeZone.h"
 
 // constants
 static constexpr float ZombieForgetDistance = 800.f;
-static constexpr float HouseScanRange = 500.f;
+static constexpr float HouseScanRange = 1200.f; //999999.f;
 
 UBTService_UpdateStatsCarvalhoAna::UBTService_UpdateStatsCarvalhoAna()
 {
@@ -289,21 +290,30 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 			bool bStillInside = false;
 			for (AActor* HA : AllHouses)
 			{
-				AHouse* House = Cast<AHouse>(HA);
-				if (!House) continue;
+				if (!HA) continue;
 
-				FHouseBounds Bounds = House->GetBounds();
-				float Margin = 200.f;
-				bool bInsideX = MyLoc.X > Bounds.Origin.X - Bounds.Extent.X - Margin && MyLoc.X < Bounds.Origin.X + Bounds.Extent.X + Margin;
-				bool bInsideY = MyLoc.Y > Bounds.Origin.Y - Bounds.Extent.Y - Margin && MyLoc.Y < Bounds.Origin.Y + Bounds.Extent.Y + Margin;
-				if (bInsideX && bInsideY) { bStillInside = true; break; }
+				// Use actor bounds (all components, not just collision) for accurate size
+				FVector BoundsOrigin, BoundsExtent;
+				HA->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+
+				// Generous margin so doorway area never false-triggers
+				const float Margin = 350.f;
+
+				// XY only (Dist2D) — Z differences on sloped ground are irrelevant
+				bool bInX = MyLoc.X > BoundsOrigin.X - BoundsExtent.X - Margin
+				         && MyLoc.X < BoundsOrigin.X + BoundsExtent.X + Margin;
+				bool bInY = MyLoc.Y > BoundsOrigin.Y - BoundsExtent.Y - Margin
+				         && MyLoc.Y < BoundsOrigin.Y + BoundsExtent.Y + Margin;
+
+				if (bInX && bInY) { bStillInside = true; break; }
 			}
 
 			if (!bStillInside)
 			{
+				// Safety net only — BlendedSteer is the primary authority
 				BBComp->SetValueAsBool(FName("IsInsideHouse"), false);
 				BBComp->ClearValue(FName("NearestHouse"));
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::White, TEXT("[HOUSE] Exited house bounds — resetting house state."));
+				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::White, TEXT("[HOUSE] Safety reset: pawn left all house bounds."));
 			}
 		}
 
@@ -336,6 +346,40 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 				BBComp->SetValueAsBool(FName("IsHeavyZombie"),  BestZombie->GetName().Contains("Heavy"));
 				BBComp->SetValueAsBool(FName("IsRunnerZombie"), BestZombie->GetName().Contains("Runner"));
 			}
+		}
+
+		{
+			TArray<AActor*> AllPurgeZones;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), APurgeZone::StaticClass(), AllPurgeZones);
+
+			bool    bNowInPurge = false;
+			FVector PurgeCentre = FVector::ZeroVector;
+
+			for (AActor* PZA : AllPurgeZones)
+			{
+				if (!PZA || !IsValid(PZA)) continue;
+
+				// Derive the zone radius from its actor bounds — public API, no protected access needed
+				FVector BoundsOrigin, BoundsExtent;
+				PZA->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+				float Radius = FMath::Max(BoundsExtent.X, BoundsExtent.Y); // XY extent = radius for circular zones
+
+				float Dist = FVector::Dist2D(MyLoc, PZA->GetActorLocation());
+
+				if (Dist < Radius)
+				{
+					bNowInPurge = true;
+					PurgeCentre = PZA->GetActorLocation();
+					break; // first match is enough
+				}
+			}
+
+			BBComp->SetValueAsBool(FName("IsInPurgeZone"), bNowInPurge);
+			if (bNowInPurge)
+				BBComp->SetValueAsVector(FName("PurgeZoneCenter"), PurgeCentre);
+
+			if (bNowInPurge)
+				GEngine->AddOnScreenDebugMessage(-1, 0.6f, FColor::Orange, TEXT("[PURGE] Inside purge zone — fleeing!"));
 		}
 	}
 
@@ -404,13 +448,9 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 		StateColor = FColor::White;
 	}
 
-	// only redraw when state changes
-	if (StateText != LastStateText || StateColor != LastStateColor)
-	{
-		LastStateText = StateText;
-		LastStateColor = StateColor;
-		GEngine->AddOnScreenDebugMessage(50, 2.0f, StateColor, FString::Printf(TEXT("AI STATE: %s"), *StateText));
-	}
+	LastStateText  = StateText;
+	LastStateColor = StateColor;
+	GEngine->AddOnScreenDebugMessage(50, 3.0f, StateColor, FString::Printf(TEXT("AI STATE: %s"), *StateText));
 
 	// refresh stats
 	GEngine->AddOnScreenDebugMessage(51, 2.0f, FColor::White, FString::Printf(TEXT("HP: %.0f  |  Stamina: %.1f  |  Weapon:%s  Medkit:%s  Food:%s"), NewHealth, NewStamina, bHasWeapon ? TEXT("YES") : TEXT("no"), bHasMedkit ? TEXT("YES") : TEXT("no"), bHasFood ? TEXT("YES") : TEXT("no")));

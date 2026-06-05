@@ -160,7 +160,10 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!RecentlySightedItems.Contains(SeenWeapon))
 			{
 				RecentlySightedItems.Add(SeenWeapon);
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, FString::Printf(TEXT("[SIGHT] Weapon spotted! Going to pick up: %s"), *SeenWeapon->GetName()));
+				GEngine->AddOnScreenDebugMessage(
+					(uint64)SeenWeapon->GetUniqueID(), // keyed slot = overwrites
+					3.f, FColor::Green,
+					FString::Printf(TEXT("[SIGHT] Weapon: %s"), *SeenWeapon->GetName()));
 			}
 			BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenWeapon);
 		}
@@ -170,7 +173,10 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!KnownItems.Contains(SeenWeapon))
 			{
 				KnownItems.AddUnique(SeenWeapon);
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Purple, FString::Printf(TEXT("[MEMORY +] Saved weapon for later: %s at (%.0f, %.0f)"), *SeenWeapon->GetName(), SeenWeapon->GetActorLocation().X, SeenWeapon->GetActorLocation().Y));
+				GEngine->AddOnScreenDebugMessage(
+					(uint64)SeenWeapon->GetUniqueID(),
+					5.f, FColor::Purple,
+					FString::Printf(TEXT("[MEMORY+] Weapon: %s"), *SeenWeapon->GetName()));
 			}
 		}
 	}
@@ -183,6 +189,10 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!RecentlySightedItems.Contains(SeenItem))
 			{
 				RecentlySightedItems.Add(SeenItem);
+				GEngine->AddOnScreenDebugMessage(
+					(uint64)SeenItem->GetUniqueID(),
+					3.f, FColor::Green,
+					FString::Printf(TEXT("[SIGHT] Garbage: %s"), *SeenItem->GetName()));
 				BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
 			}
 		}
@@ -194,7 +204,10 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!RecentlySightedItems.Contains(SeenItem))
 			{
 				RecentlySightedItems.Add(SeenItem);
-				GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Green, FString::Printf(TEXT("[SIGHT] Item spotted! Going to pick up: %s"), *SeenItem->GetName()));
+				GEngine->AddOnScreenDebugMessage(
+					(uint64)SeenItem->GetUniqueID(),
+					3.f, FColor::Green,
+					FString::Printf(TEXT("[SIGHT] Item: %s"), *SeenItem->GetName()));
 				BlackboardComp->SetValueAsObject(FName("NearestItem"), SeenItem);
 			}
 		}
@@ -204,7 +217,10 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 			if (!KnownItems.Contains(SeenItem))
 			{
 				KnownItems.AddUnique(SeenItem);
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Purple, FString::Printf(TEXT("[MEMORY +] Saved item for later: %s at (%.0f, %.0f)"), *SeenItem->GetName(), SeenItem->GetActorLocation().X, SeenItem->GetActorLocation().Y));
+				GEngine->AddOnScreenDebugMessage(
+					(uint64)SeenItem->GetUniqueID(),
+					5.f, FColor::Purple,
+					FString::Printf(TEXT("[MEMORY+] %s"), *SeenItem->GetName()));
 			}
 		}
 	}
