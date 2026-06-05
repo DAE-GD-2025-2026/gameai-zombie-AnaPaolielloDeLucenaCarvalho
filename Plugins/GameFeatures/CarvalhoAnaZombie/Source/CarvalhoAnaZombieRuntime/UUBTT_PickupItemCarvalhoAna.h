@@ -14,4 +14,7 @@ public:
 
 protected:
 	virtual EBTNodeResult::Type ExecuteTask(UBehaviorTreeComponent& OwnerComp, uint8* NodeMemory) override;
+
+private:
+	void ReScanRoomForNextItem(class UInventoryComponent* Inv, class UBlackboardComponent* BB, APawn* Pawn);
 };

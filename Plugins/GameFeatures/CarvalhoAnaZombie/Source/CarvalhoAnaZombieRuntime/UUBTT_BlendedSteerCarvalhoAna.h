@@ -67,6 +67,11 @@ private:
 	// seek force
 	FVector LastSeekForce = FVector::ZeroVector;
 
+	// debug timers
+	float OrangeDebugTimer = 0.f;
+	float YellowDebugTimer = 0.f;
+	float PurpleDebugTimer = 0.f;
+
 	// aiming debug
 	UPROPERTY(EditAnywhere, Category = "Debug")
 	bool bDrawAimingDebug = true;

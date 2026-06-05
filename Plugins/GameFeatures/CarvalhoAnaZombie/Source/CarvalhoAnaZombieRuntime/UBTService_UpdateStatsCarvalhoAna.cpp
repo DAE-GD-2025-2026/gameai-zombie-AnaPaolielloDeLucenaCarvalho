@@ -179,7 +179,7 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 		TArray<AActor*> AllItems;
 		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ABaseItem::StaticClass(), AllItems);
 
-		float BestDist = 400.f;
+		float BestDist = 700.f;
 		ABaseItem* BestItem = nullptr;
 
 		for (AActor* IA : AllItems)
@@ -247,6 +247,34 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 						return FVector::Dist2D(Loc, BestHouse->GetActorLocation()) < 200.f;
 					});
 					if (!bKnown) Perceptor->KnownHouses.AddUnique(BestHouse->GetActorLocation());
+				}
+			}
+
+			if (!CurrentHouse && Perceptor)
+			{
+				// find closest known house that is still unvisited
+				float MemBestDist = 999999.f;
+				AHouse* MemBestHouse = nullptr;
+
+				for (const FVector& KnownLoc : Perceptor->KnownHouses)
+				{
+					for (AActor* HA : AllHouses)
+					{
+						AHouse* House = Cast<AHouse>(HA);
+						if (!House || !IsValid(House)) continue;
+						if (Perceptor->VisitedHouses.Contains(House)) continue;
+						if (FVector::Dist2D(House->GetActorLocation(), KnownLoc) > 200.f) continue;
+
+						float D = FVector::Dist2D(MyLoc, House->GetActorLocation());
+						if (D < MemBestDist) { MemBestDist = D; MemBestHouse = House; }
+					}
+				}
+
+				if (MemBestHouse)
+				{
+					BBComp->SetValueAsObject(FName("NearestHouse"), MemBestHouse);
+					CurrentHouse = MemBestHouse;
+					GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Blue, FString::Printf(TEXT("[MEMORY->] Heading to remembered house (%.0f units)"), MemBestDist));
 				}
 			}
 		}
@@ -384,7 +412,25 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 		GEngine->AddOnScreenDebugMessage(50, 2.0f, StateColor, FString::Printf(TEXT("AI STATE: %s"), *StateText));
 	}
 
-	// refresh
-	GEngine->AddOnScreenDebugMessage(51, 2.0f, FColor::White, FString::Printf(TEXT("HP: %.0f  |  Stamina: %.1f  |  Weapon:%s  Medkit:%s  Food:%s"), NewHealth, NewStamina, bHasWeapon ? TEXT("YES") : TEXT("no"), bHasMedkit ? TEXT("YES") : TEXT("no"), bHasFood   ? TEXT("YES") : TEXT("no")));
-	GEngine->AddOnScreenDebugMessage(52, 2.0f, FColor::Silver, FString::Printf(TEXT("Zombie:%s  House:%s  Item:%s  InPurge:%s  InHouse:%s  EmptySlots:%d"), bHasZombie ? TEXT("YES") : TEXT("no"), bHasHouse ? TEXT("YES") : TEXT("no"), bHasItem   ? TEXT("YES") : TEXT("no"), bIsInPurge ? TEXT("YES") : TEXT("no"), bIsInHouse ? TEXT("YES") : TEXT("no"), EmptySlots));
+	// refresh stats
+	GEngine->AddOnScreenDebugMessage(51, 2.0f, FColor::White, FString::Printf(TEXT("HP: %.0f  |  Stamina: %.1f  |  Weapon:%s  Medkit:%s  Food:%s"), NewHealth, NewStamina, bHasWeapon ? TEXT("YES") : TEXT("no"), bHasMedkit ? TEXT("YES") : TEXT("no"), bHasFood ? TEXT("YES") : TEXT("no")));
+	GEngine->AddOnScreenDebugMessage(52, 2.0f, FColor::Silver, FString::Printf(TEXT("Zombie:%s  House:%s  Item:%s  InPurge:%s  InHouse:%s  EmptySlots:%d"), bHasZombie ? TEXT("YES") : TEXT("no"), bHasHouse ? TEXT("YES") : TEXT("no"), bHasItem ? TEXT("YES") : TEXT("no"), bIsInPurge ? TEXT("YES") : TEXT("no"), bIsInHouse ? TEXT("YES") : TEXT("no"), EmptySlots));
+
+	// ammo count so the UI updates on every shot
+	if (UInventoryComponent* InvDisplay = Pawn->FindComponentByClass<UInventoryComponent>())
+	{
+		int32 Ammo = -1;
+		for (ABaseItem* Slot : InvDisplay->GetInventory())
+		{
+			if (Slot && Cast<AWeapon>(Slot)) { Ammo = Slot->GetValue(); break; }
+		}
+		FString AmmoStr = (Ammo >= 0) ? FString::Printf(TEXT("%d"), Ammo) : TEXT("---");
+		GEngine->AddOnScreenDebugMessage(53, 2.0f, FColor::Yellow, FString::Printf(TEXT("Gun Ammo: %s"), *AmmoStr));
+	}
+
+	// current memory list
+	if (Perceptor)
+	{
+		GEngine->AddOnScreenDebugMessage(54, 2.0f, FColor::Purple, FString::Printf(TEXT("Memory: %d item(s) | %d house(s)"), Perceptor->KnownItems.Num(), Perceptor->KnownHouses.Num()));
+	}
 }

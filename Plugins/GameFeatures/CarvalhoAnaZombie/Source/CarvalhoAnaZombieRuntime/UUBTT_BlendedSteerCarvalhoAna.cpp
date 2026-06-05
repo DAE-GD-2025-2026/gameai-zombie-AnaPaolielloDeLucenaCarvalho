@@ -2,13 +2,10 @@
 #include "AIController.h"
 #include "UStudentPerceptorCarvalhoAna.h"
 #include "BehaviorTree/BlackboardComponent.h"
-#include "GameFramework/PawnMovementComponent.h"
 #include "Survivor/SurvivorPawn.h"
 #include "Common/StaminaComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "Village/House/House.h"
 #include "NavigationSystem.h"
-#include "NavMesh/NavMeshPath.h"
 
 UUBTT_BlendedSteerCarvalhoAna::UUBTT_BlendedSteerCarvalhoAna()
 {
@@ -180,8 +177,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 
 		float DistToDoor = FVector::Dist2D(Pawn->GetActorLocation(), DoorwayLoc);
 
-		// close to the doorway = out
-		if (DistToDoor < 60.f)
+		if (DistToDoor < 150.f)
 		{
 			BBComp->SetValueAsBool(FName("IsInsideHouse"), false);
 			FinishLatentTask(OwnerComp, EBTNodeResult::Succeeded);
@@ -195,34 +191,71 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 	FVector WanderForce = FVector::ZeroVector;
 
 	float DistToWanderTarget = FVector::Dist(Pawn->GetActorLocation(), LastWanderTarget);
-	bool  bNeedNewTarget = DistToWanderTarget < WanderTargetReachedDistance || TimeSinceWanderStart > 12.0f || LastWanderTarget.IsNearlyZero();
+	bool  bNeedNewTarget = DistToWanderTarget < WanderTargetReachedDistance || TimeSinceWanderStart > 8.0f || LastWanderTarget.IsNearlyZero();
 
 	if (bNeedNewTarget)
 	{
 		if (UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(World))
 		{
 			FVector CurrentLoc = Pawn->GetActorLocation();
-			float SearchRadius = FMath::RandRange(2500.f, 5000.f);
+			bool bFoundTarget  = false;
 
-			float PreferredAngle = WanderAngle + FMath::RandRange(-PI / 3.f, PI / 3.f);
+			UStudentPerceptorCarvalhoAna* WPerceptor = nullptr;
+			if (AAIController* AIC = OwnerComp.GetAIOwner())
+			{
+				WPerceptor = AIC->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+				if (!WPerceptor) WPerceptor = Pawn->FindComponentByClass<UStudentPerceptorCarvalhoAna>();
+			}
+
+			if (WPerceptor && WPerceptor->KnownHouses.Num() > 0)
+			{
+				// find nearest UNVISITED known house and steer toward it
+				FVector BestHouseDir = FVector::ZeroVector;
+				float   BestHouseDist = 999999.f;
+				for (const FVector& KH : WPerceptor->KnownHouses)
+				{
+					float D = FVector::Dist2D(CurrentLoc, KH);
+					if (D > 300.f && D < BestHouseDist) // skip house we're standing in
+						{ BestHouseDist = D; BestHouseDir = (KH - CurrentLoc).GetSafeNormal2D(); }
+				}
+
+				if (!BestHouseDir.IsNearlyZero())
+				{
+					float HouseAngle = FMath::Atan2(BestHouseDir.Y, BestHouseDir.X);
+					HouseAngle += FMath::RandRange(-PI / 4.f, PI / 4.f);
+					WanderAngle = HouseAngle;
+				}
+			}
+
+			float SearchRadius = FMath::RandRange(2000.f, 4000.f);
+			float PreferredAngle = WanderAngle + FMath::RandRange(-PI / 4.f, PI / 4.f);
 			FVector PreferredDir = FVector(FMath::Cos(PreferredAngle), FMath::Sin(PreferredAngle), 0.f);
 			FVector Candidate = CurrentLoc + PreferredDir * SearchRadius;
 
 			FNavLocation Projected;
-			if (!NavSys->ProjectPointToNavigation(Candidate, Projected, FVector(500.f, 500.f, 200.f)))
+			if (NavSys->GetRandomReachablePointInRadius(Candidate, 600.f, Projected))
 			{
-				// fallback - random
-				FVector RandOff(FMath::RandRange(-3000.f, 3000.f), FMath::RandRange(-3000.f, 3000.f), 0.f);
-				NavSys->ProjectPointToNavigation(CurrentLoc + RandOff, Projected, FVector(500.f, 500.f, 200.f));
+				LastWanderTarget = Projected.Location;
+				bFoundTarget = true;
+			}
+			else
+			{
+				// fallback - random reachable point from current position
+				if (NavSys->GetRandomReachablePointInRadius(CurrentLoc, 3000.f, Projected))
+				{
+					LastWanderTarget = Projected.Location;
+					bFoundTarget = true;
+				}
+				// if fallback fails - keep old target
 			}
 
-			LastWanderTarget = Projected.Location;
-			TimeSinceWanderStart = 0.f;
-
-			FVector NewDir = (LastWanderTarget - CurrentLoc).GetSafeNormal2D();
-			if (!NewDir.IsNearlyZero()) WanderAngle = FMath::Atan2(NewDir.Y, NewDir.X);
-
-			if (bDrawAimingDebug) DrawDebugSphere(World, LastWanderTarget, 40.f, 8, FColor::Yellow, false, 3.f);
+			if (bFoundTarget)
+			{
+				TimeSinceWanderStart = 0.f;
+				FVector NewDir = (LastWanderTarget - CurrentLoc).GetSafeNormal2D();
+				if (!NewDir.IsNearlyZero()) WanderAngle = FMath::Atan2(NewDir.Y, NewDir.X);
+				if (bDrawAimingDebug) DrawDebugSphere(World, LastWanderTarget, 40.f, 8, FColor::Yellow, false, 3.f);
+			}
 		}
 	}
 	TimeSinceWanderStart += DeltaSeconds;
@@ -233,6 +266,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 
 // FLEE ZOMBIE/PURGE
 	FVector FleeForce = FVector::ZeroVector;
+	bool bIsInPurge = BBComp->GetValueAsBool(FName("IsInPurgeZone"));
 
 	if (NearestZombie)
 	{
@@ -259,6 +293,21 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 				float FleeW = FMath::Lerp(0.4f, 0.85f, FMath::Clamp(1.f - ZombieDist / 600.f, 0.f, 1.f));
 				FleeForce = (FleeForce * FleeW + SeekHouse * (1.f - FleeW)).GetSafeNormal();
 			}
+		}
+	}
+	else if (bIsInPurge)
+	{
+		FVector PurgeLoc = BBComp->GetValueAsVector(FName("PurgeZoneCenter"));
+		if (!PurgeLoc.IsNearlyZero())
+		{
+			FVector ToPurge = PurgeLoc - Pawn->GetActorLocation();
+			FleeForce = -ToPurge.GetSafeNormal2D(); // flee directly away from the zone centre
+		}
+		else
+		{
+			// fallback - flee in the opposite of the current movement direction
+			FleeForce = -Pawn->GetActorForwardVector().GetSafeNormal2D();
+			if (FleeForce.IsNearlyZero()) FleeForce = FVector(1.f, 0.f, 0.f);
 		}
 	}
 
@@ -308,7 +357,13 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 
 				StuckTimer = 0.f;
 
-				if (bDrawAimingDebug) DrawDebugSphere(World, Pawn->GetActorLocation() + FVector(0,0,100), 60.f, 16, FColor::Purple, false, 0.5f);
+				// purple stuck sphere
+				PurpleDebugTimer += DeltaSeconds;
+				if (bDrawAimingDebug && PurpleDebugTimer >= 0.5f)
+				{
+					PurpleDebugTimer = 0.f;
+					DrawDebugSphere(World, Pawn->GetActorLocation() + FVector(0,0,100), 40.f, 8, FColor::Purple, false, 0.45f);
+				}
 			}
 		}
 		else
@@ -357,7 +412,14 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 	{
 		bIsHallway = bInHallway = true;
 		AvoidanceForce = Forward * 3.f;
-		if (bDrawAimingDebug) DrawDebugSphere(World, Start + FVector(0,0,100), 80.f, 12, FColor::Yellow, false, -1.f);
+
+		// yellow hallway sphere
+		YellowDebugTimer += DeltaSeconds;
+		if (bDrawAimingDebug && YellowDebugTimer >= 0.5f)
+		{
+			YellowDebugTimer = 0.f;
+			DrawDebugSphere(World, Start + FVector(0,0,100), 50.f, 8, FColor::Yellow, false, 0.45f);
+		}
 	}
 	else
 	{
@@ -371,7 +433,13 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		bIsStuck = true;
 		LastWanderTarget = FVector::ZeroVector;
 		TimeSinceWanderStart = 999.f;
-		if (bDrawAimingDebug) DrawDebugSphere(World, Start + FVector(0,0,120), 100.f, 16, FColor::Orange, false, 0.5f);
+
+		OrangeDebugTimer += DeltaSeconds;
+		if (bDrawAimingDebug && OrangeDebugTimer >= 0.5f)
+		{
+			OrangeDebugTimer = 0.f;
+			DrawDebugSphere(World, Start + FVector(0,0,120), 60.f, 8, FColor::Orange, false, 0.5f);
+		}
 	}
 	else if (WhiskersHitting == 2)
 	{
@@ -453,7 +521,16 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		FVector AimStart = Pawn->GetActorLocation() + FVector(0, 0, 80);
 		DrawDebugLine(World, AimStart, AimStart + Pawn->GetActorForwardVector() * 200.f, FColor::Cyan, false, -1.f, 0, 3.f);
 		if (!FinalSteeringForce.IsNearlyZero()) DrawDebugLine(World, AimStart, AimStart + FinalSteeringForce * 200.f, FColor::Yellow, false, -1.f, 0, 2.f);
-		if (bIsStuck) DrawDebugSphere(World, AimStart, 50.f, 12, FColor::Purple, false, -1.f);
+		if (bIsStuck)
+		{
+			// purple stuck indicator
+			PurpleDebugTimer += DeltaSeconds; // timer already incremented above when drawing on stuck event
+			if (PurpleDebugTimer >= 0.5f)
+			{
+				PurpleDebugTimer = 0.f;
+				DrawDebugSphere(World, AimStart, 35.f, 8, FColor::Purple, false, 0.45f);
+			}
+		}
 		if (NearestZombie) DrawDebugLine(World, AimStart, NearestZombie->GetActorLocation(), FColor::Red, false, -1.f, 0, 1.5f);
 		if (!LastWanderTarget.IsZero()) DrawDebugLine(World, Pawn->GetActorLocation(), LastWanderTarget, FColor::White, false, -1.f, 0, 1.f);
 	}
