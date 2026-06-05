@@ -133,7 +133,7 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 		if (!bAlreadyKnown)
 		{
 			KnownHouses.AddUnique(SeenHouse->GetActorLocation()); 
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Blue, FString::Printf(TEXT("[MEMORY +] Saved house location at (%.0f, %.0f)"), SeenHouse->GetActorLocation().X, SeenHouse->GetActorLocation().Y));
+			GEngine->AddOnScreenDebugMessage((uint64)SeenHouse->GetUniqueID(), 5.f, FColor::Blue, FString::Printf(TEXT("[MEMORY +] Saved house location at (%.0f, %.0f)"), SeenHouse->GetActorLocation().X, SeenHouse->GetActorLocation().Y));
 		}
 
 		// do not set NearestHouse while inside
@@ -144,7 +144,7 @@ void UStudentPerceptorCarvalhoAna::OnPerceptionUpdated(AActor* Actor, FAIStimulu
 		{
 			// new house, loot it
 			BlackboardComp->SetValueAsObject(FName("NearestHouse"), SeenHouse);
-			GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Cyan, FString::Printf(TEXT("[SIGHT] New house spotted! Going to loot it.")));
+			GEngine->AddOnScreenDebugMessage((uint64)SeenHouse->GetUniqueID() + 10000, 3.f, FColor::Cyan, FString::Printf(TEXT("[SIGHT] New house spotted! Going to loot it.")));
 		}
 		else
 		{

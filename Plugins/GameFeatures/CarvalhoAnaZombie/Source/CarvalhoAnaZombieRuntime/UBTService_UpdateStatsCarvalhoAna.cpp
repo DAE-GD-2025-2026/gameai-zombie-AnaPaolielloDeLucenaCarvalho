@@ -366,7 +366,9 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 
 				float Dist = FVector::Dist2D(MyLoc, PZA->GetActorLocation());
 
-				if (Dist < Radius)
+				float FleeMargin = 800.f;
+
+				if (Dist < Radius + FleeMargin)
 				{
 					bNowInPurge = true;
 					PurgeCentre = PZA->GetActorLocation();
@@ -379,7 +381,7 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 				BBComp->SetValueAsVector(FName("PurgeZoneCenter"), PurgeCentre);
 
 			if (bNowInPurge)
-				GEngine->AddOnScreenDebugMessage(-1, 0.6f, FColor::Orange, TEXT("[PURGE] Inside purge zone — fleeing!"));
+				GEngine->AddOnScreenDebugMessage(-1, 0.6f, FColor::Orange, TEXT("[PURGE] Evading purge zone!"));
 		}
 	}
 

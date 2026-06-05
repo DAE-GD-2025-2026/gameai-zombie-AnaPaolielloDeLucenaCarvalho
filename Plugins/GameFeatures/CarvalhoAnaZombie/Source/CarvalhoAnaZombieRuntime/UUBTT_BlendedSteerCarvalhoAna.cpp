@@ -6,6 +6,7 @@
 #include "Common/StaminaComponent.h"
 #include "Village/House/House.h"
 #include "NavigationSystem.h"
+#include "Kismet/GameplayStatics.h"
 
 UUBTT_BlendedSteerCarvalhoAna::UUBTT_BlendedSteerCarvalhoAna()
 {
@@ -227,18 +228,46 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 				}
 			}
 
-			float SearchRadius = FMath::RandRange(2000.f, 4000.f);
-			float PreferredAngle = WanderAngle + FMath::RandRange(-PI / 4.f, PI / 4.f);
-			FVector PreferredDir = FVector(FMath::Cos(PreferredAngle), FMath::Sin(PreferredAngle), 0.f);
-			FVector Candidate = CurrentLoc + PreferredDir * SearchRadius;
-
 			FNavLocation Projected;
-			if (NavSys->GetRandomReachablePointInRadius(Candidate, 600.f, Projected))
+			
+			TArray<AActor*> AllHouses;
+			UGameplayStatics::GetAllActorsOfClass(World, AHouse::StaticClass(), AllHouses);
+
+			for (int32 Attempt = 0; Attempt < 5; ++Attempt)
 			{
-				LastWanderTarget = Projected.Location;
-				bFoundTarget = true;
+				float SearchRadius = FMath::RandRange(2000.f, 4000.f);
+				float PreferredAngle = WanderAngle + FMath::RandRange(-PI / 4.f, PI / 4.f);
+				if (Attempt > 2) PreferredAngle = FMath::RandRange(-PI, PI); // fully random if failing
+				
+				FVector PreferredDir = FVector(FMath::Cos(PreferredAngle), FMath::Sin(PreferredAngle), 0.f);
+				FVector Candidate = CurrentLoc + PreferredDir * SearchRadius;
+
+				if (NavSys->GetRandomReachablePointInRadius(Candidate, 600.f, Projected))
+				{
+					bool bInsideHouse = false;
+					for (AActor* HA : AllHouses)
+					{
+						if (!HA) continue;
+						FVector Origin, Extent;
+						HA->GetActorBounds(false, Origin, Extent);
+						const float Margin = 200.f; // Buffer to prevent pathing directly against outer walls
+						
+						bool bInX = Projected.Location.X > Origin.X - Extent.X - Margin && Projected.Location.X < Origin.X + Extent.X + Margin;
+						bool bInY = Projected.Location.Y > Origin.Y - Extent.Y - Margin && Projected.Location.Y < Origin.Y + Extent.Y + Margin;
+						
+						if (bInX && bInY) { bInsideHouse = true; break; }
+					}
+
+					if (!bInsideHouse)
+					{
+						LastWanderTarget = Projected.Location;
+						bFoundTarget = true;
+						break;
+					}
+				}
 			}
-			else
+
+			if (!bFoundTarget)
 			{
 				// fallback - random reachable point from current position
 				if (NavSys->GetRandomReachablePointInRadius(CurrentLoc, 3000.f, Projected))
@@ -301,7 +330,7 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 		if (!PurgeLoc.IsNearlyZero())
 		{
 			FVector ToPurge = PurgeLoc - Pawn->GetActorLocation();
-			FleeForce = -ToPurge.GetSafeNormal2D(); // flee directly away from the zone centre
+			FleeForce = -ToPurge.GetSafeNormal2D(); // flee directly away from the zone center
 		}
 		else
 		{
