@@ -270,10 +270,28 @@ void UUBTT_BlendedSteerCarvalhoAna::TickTask(UBehaviorTreeComponent& OwnerComp, 
 			if (!bFoundTarget)
 			{
 				// fallback - random reachable point from current position
-				if (NavSys->GetRandomReachablePointInRadius(CurrentLoc, 3000.f, Projected))
+				for (int32 FbAttempt = 0; FbAttempt < 3; ++FbAttempt)
 				{
-					LastWanderTarget = Projected.Location;
-					bFoundTarget = true;
+					if (NavSys->GetRandomReachablePointInRadius(CurrentLoc, 3000.f, Projected))
+					{
+						bool bInsideHouseFb = false;
+						for (AActor* HA : AllHouses)
+						{
+							if (!HA) continue;
+							FVector Origin, Extent;
+							HA->GetActorBounds(false, Origin, Extent);
+							const float Margin = 200.f;
+							bool bInX = Projected.Location.X > Origin.X - Extent.X - Margin && Projected.Location.X < Origin.X + Extent.X + Margin;
+							bool bInY = Projected.Location.Y > Origin.Y - Extent.Y - Margin && Projected.Location.Y < Origin.Y + Extent.Y + Margin;
+							if (bInX && bInY) { bInsideHouseFb = true; break; }
+						}
+						if (!bInsideHouseFb)
+						{
+							LastWanderTarget = Projected.Location;
+							bFoundTarget = true;
+							break;
+						}
+					}
 				}
 				// if fallback fails - keep old target
 			}

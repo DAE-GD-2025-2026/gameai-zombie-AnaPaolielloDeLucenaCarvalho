@@ -317,6 +317,41 @@ void UBTService_UpdateStatsCarvalhoAna::TickNode(UBehaviorTreeComponent& OwnerCo
 			}
 		}
 
+		if (!BBComp->GetValueAsBool(FName("IsInsideHouse")))
+		{
+			TArray<AActor*> AllHousesForTrap;
+			UGameplayStatics::GetAllActorsOfClass(GetWorld(), AHouse::StaticClass(), AllHousesForTrap);
+
+			for (AActor* HA : AllHousesForTrap)
+			{
+				AHouse* House = Cast<AHouse>(HA);
+				if (!House || !IsValid(House)) continue;
+
+				FVector BoundsOrigin, BoundsExtent;
+				House->GetActorBounds(false, BoundsOrigin, BoundsExtent);
+
+				const float TrapMargin = 80.f;
+				bool bInX = MyLoc.X > BoundsOrigin.X - BoundsExtent.X + TrapMargin
+				         && MyLoc.X < BoundsOrigin.X + BoundsExtent.X - TrapMargin;
+				bool bInY = MyLoc.Y > BoundsOrigin.Y - BoundsExtent.Y + TrapMargin
+				         && MyLoc.Y < BoundsOrigin.Y + BoundsExtent.Y - TrapMargin;
+
+				if (bInX && bInY)
+				{
+					FVector OutsideDir = (MyLoc - BoundsOrigin).GetSafeNormal2D();
+					FVector DoorwayExit = MyLoc + OutsideDir * 400.f;
+
+					BBComp->SetValueAsBool(FName("IsInsideHouse"), true);
+					BBComp->SetValueAsObject(FName("NearestHouse"), House);
+					BBComp->SetValueAsVector(FName("DoorwayLocation"), DoorwayExit);
+
+					GEngine->AddOnScreenDebugMessage(-1, 4.f, FColor::Yellow,
+						TEXT("[HOUSE] Wander-trap detected — forcing IsInsideHouse=true to recover."));
+					break;
+				}
+			}
+		}
+
 		if (!BBComp->GetValueAsObject(FName("NearestZombie")))
 		{
 			TArray<AActor*> AllZombies;
